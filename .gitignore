@@ -1,0 +1,54 @@
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Dependências do Node.js
+/frontend/web-app/node_modules/
+/frontend/web-app/.pnp
+/frontend/web-app/.pnp.js
+
+# Arquivos de build
+/frontend/web-app/build/
+/frontend/web-app/dist/
+/backend/services/*/build/
+/backend/services/*/bin/
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/logs/
+*.log
+
+# Arquivos temporários
+/tmp/
+*.tmp
+*.bak
+*.swp
+
+# Dependências Go
+/backend/services/*/vendor/
+/backend/services/*/.idea/
+/backend/services/*/go.sum
+
+# Arquivos de testes
+/frontend/web-app/coverage/
+
+# Arquivos específicos de editores
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Dados locais do Docker
+/data/
+
+# Arquivos de cache
+.cache/

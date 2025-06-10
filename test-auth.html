@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Autenticação</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: auto;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste de Autenticação JWT com Cookies HttpOnly</h1>
+    
+    <div>
+        <h2>Login</h2>
+        <label>Email: <input type="email" id="email" value="admin@example.com"></label><br>
+        <label>Senha: <input type="password" id="password" value="senha123"></label><br>
+        <button onclick="login()">Login</button>
+    </div>
+    
+    <div>
+        <h2>Ações</h2>
+        <button onclick="getMeInfo()">GET /me</button>
+        <button onclick="refreshToken()">POST /refresh</button>
+        <button onclick="logout()">Logout</button>
+    </div>
+    
+    <h2>Resultado:</h2>
+    <pre id="result">Aguardando ação...</pre>
+    
+    <h2>Cookies no navegador:</h2>
+    <pre id="cookies">Use as ações acima para verificar os cookies</pre>
+
+    <script>
+        // URL base da API
+        const apiBaseUrl = 'http://localhost:3085/api/v1/identity';
+        
+        // Função para exibir resposta
+        function showResponse(data, isError = false) {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = JSON.stringify(data, null, 2);
+            resultElement.className = isError ? 'error' : 'success';
+            
+            // Atualizar informações de cookies
+            showCookies();
+        }
+        
+        // Mostrar cookies atuais
+        function showCookies() {
+            const cookieElement = document.getElementById('cookies');
+            const cookiesStr = document.cookie;
+            
+            if (cookiesStr) {
+                const visibleCookies = {};
+                cookiesStr.split(';').forEach(cookie => {
+                    const [name, value] = cookie.trim().split('=');
+                    visibleCookies[name] = value;
+                });
+                cookieElement.textContent = 'Cookies visíveis via JavaScript:\n' + 
+                    JSON.stringify(visibleCookies, null, 2) + 
+                    '\n\nNota: Cookies HttpOnly não aparecem aqui, mas podem estar presentes.';
+            } else {
+                cookieElement.textContent = 'Nenhum cookie visível via JavaScript.\n' +
+                    'Cookies HttpOnly podem estar presentes, mas não são acessíveis por JavaScript.';
+            }
+        }
+        
+        // Login
+        async function login() {
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                const response = await fetch(`${apiBaseUrl}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include'  // Importante: permite enviar/receber cookies
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro no login');
+                }
+                
+                showResponse({
+                    status: response.status,
+                    statusText: response.statusText,
+                    data
+                });
+            } catch (error) {
+                showResponse({
+                    error: error.message
+                }, true);
+            }
+        }
+        
+        // Obter informações do usuário (/me)
+        async function getMeInfo() {
+            try {
+                const response = await fetch(`${apiBaseUrl}/me`, {
+                    method: 'GET',
+                    credentials: 'include'  // Importante: permite enviar/receber cookies
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao obter informações do usuário');
+                }
+                
+                showResponse({
+                    status: response.status,
+                    statusText: response.statusText,
+                    data
+                });
+            } catch (error) {
+                showResponse({
+                    error: error.message
+                }, true);
+            }
+        }
+        
+        // Refresh Token
+        async function refreshToken() {
+            try {
+                const response = await fetch(`${apiBaseUrl}/refresh`, {
+                    method: 'POST',
+                    credentials: 'include'  // Importante: permite enviar/receber cookies
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao atualizar o token');
+                }
+                
+                showResponse({
+                    status: response.status,
+                    statusText: response.statusText,
+                    data
+                });
+            } catch (error) {
+                showResponse({
+                    error: error.message
+                }, true);
+            }
+        }
+        
+        // Logout
+        async function logout() {
+            try {
+                const response = await fetch(`${apiBaseUrl}/logout`, {
+                    method: 'POST',
+                    credentials: 'include'  // Importante: permite enviar/receber cookies
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro ao fazer logout');
+                }
+                
+                showResponse({
+                    status: response.status,
+                    statusText: response.statusText,
+                    data
+                });
+            } catch (error) {
+                showResponse({
+                    error: error.message
+                }, true);
+            }
+        }
+
+        // Mostrar cookies iniciais
+        showCookies();
+    </script>
+</body>
+</html>

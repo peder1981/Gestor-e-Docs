@@ -1,0 +1,75 @@
+services:
+  # Serviço de Identidade (GoLang)
+  identity-service:
+    build:
+      context: ./backend/services/identity-service
+      dockerfile: Dockerfile # Será criado na próxima etapa
+    container_name: identity_service
+    ports:
+      - "8085:8085" # Porta exposta para o serviço de identidade
+    # volumes:
+    #   - ./backend/services/identity-service:/app # Monta o código para desenvolvimento (TEMPORARIAMENTE DESABILITADO PARA TESTE)
+    environment:
+      # Variáveis de ambiente para o serviço de identidade (ex: string de conexão com MongoDB, segredo JWT)
+      - MONGO_URI=mongodb://mongo_db:27017/gestor_e_docs
+      - JWT_SECRET_KEY=seuSuperSegredoMuitoComplexoAqui
+      - SERVICE_PORT=8085
+      - GIN_MODE=debug # Garante que estamos em modo de desenvolvimento
+    depends_on:
+      - mongo_db
+    networks:
+      - gestor_e_docs_net
+
+  # Frontend (React)
+  frontend-app:
+    build:
+      context: ./frontend/web-app
+      dockerfile: Dockerfile # Será criado na próxima etapa
+    container_name: frontend_app
+    ports:
+      - "3085:80" # Mapeia a porta 80 do container para a 3085 do host
+    volumes:
+      - ./frontend/web-app:/app # Monta o código para desenvolvimento
+      - /app/node_modules # Evita que node_modules local sobrescreva o do container
+    environment:
+      - CHOKIDAR_USEPOLLING=true # Para hot-reloading em alguns ambientes Docker
+
+    depends_on:
+      - identity-service
+    networks:
+      - gestor_e_docs_net
+
+  # Banco de Dados MongoDB
+  mongo_db:
+    image: mongo:latest
+    container_name: mongo_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db # Volume persistente para os dados do MongoDB
+    networks:
+      - gestor_e_docs_net
+
+  # Armazenamento de Objetos MinIO
+  minio_server:
+    image: minio/minio:latest
+    container_name: minio_server
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console Web
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    networks:
+      - gestor_e_docs_net
+
+volumes:
+  mongo_data:
+  minio_data:
+
+networks:
+  gestor_e_docs_net:
+    driver: bridge
