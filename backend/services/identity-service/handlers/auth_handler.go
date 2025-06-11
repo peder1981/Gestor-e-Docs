@@ -125,8 +125,8 @@ func LoginUser(c *gin.Context) {
 		Value:    accessToken,
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
-		Domain:   "localhost",
-		Secure:   false,
+		// Removendo Domain para aceitar qualquer domínio
+		Secure:   true, // Necessário para HTTPS
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
@@ -137,12 +137,14 @@ func LoginUser(c *gin.Context) {
 		Value:    refreshToken,
 		MaxAge:   7 * 24 * 60 * 60, // 7 dias
 		Path:     "/",
-		Domain:   "localhost",
-		Secure:   false,
+		// Removendo Domain para aceitar qualquer domínio
+		Secure:   true, // Necessário para HTTPS
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(c.Writer, &refreshTokenCookie)
+
+	log.Printf("[LoginUser] Cookies definidos com Secure=true e sem restrição de domínio para usuário %s", req.Email)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -157,8 +159,10 @@ func LoginUser(c *gin.Context) {
 // LogoutUser invalida os cookies de autenticação do usuário
 func LogoutUser(c *gin.Context) {
 	// Define os cookies com MaxAge -1 para instruir o navegador a excluí-los
-	c.SetCookie("access_token", "", -1, "/", "localhost", false, true)
-	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
+	// Removendo Domain e configurando Secure=true para consistência
+	c.SetCookie("access_token", "", -1, "/", "", true, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	log.Printf("[LogoutUser] Cookies removidos com Secure=true e sem restrição de domínio")
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
 
@@ -192,19 +196,19 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// Como estamos usando HTTPS, Secure pode ser sempre true.
-	// SameSite=None requer que Secure seja true.
+	// Como estamos usando HTTPS, Secure deve ser true.
 	newAccessTokenCookie := http.Cookie{
 		Name:     "access_token",
 		Value:    newAccessToken,
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
-		Domain:   "localhost",
-		Secure:   false,
+		// Removendo Domain para aceitar qualquer domínio
+		Secure:   true, // Necessário para HTTPS
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(c.Writer, &newAccessTokenCookie)
+	log.Printf("[RefreshToken] Cookie de access token atualizado com Secure=true e sem restrição de domínio")
 
 	log.Printf("[RefreshToken] New access token generated and set for user %s.", claims.Subject)
 	c.JSON(http.StatusOK, gin.H{"message": "Access token refreshed successfully"})

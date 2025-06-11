@@ -1,12 +1,40 @@
 services:
+  # Nginx para TLS/SSL e proxy reverso
+  nginx:
+    image: nginx:latest
+    container_name: nginx_proxy
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./certs:/etc/nginx/certs
+      - ./nginx/logs:/var/log/nginx
+    ports:
+      - "443:443"  # HTTPS para frontend
+      - "8085:8085" # API Identity
+      - "8185:8185" # API Document
+      - "9085:9085" # MinIO API
+      - "9185:9185" # MinIO Console
+    depends_on:
+      - frontend-app
+      - identity-service
+      - document-service
+      - minio_server
+    networks:
+      - gestor_e_docs_net
+    # Removendo temporariamente o logging com Fluentd para garantir que o Nginx inicie corretamente
+    # Após o sistema estar funcionando, podemos reativar essa configuração
+    # logging:
+    #   driver: "fluentd"
+    #   options:
+    #     fluentd-address: "fluentd:24224"
+    #     tag: nginx
+
   # Serviço de Identidade (GoLang)
   identity-service:
     build:
       context: ./backend/services/identity-service
-      dockerfile: Dockerfile # Será criado na próxima etapa
+      dockerfile: Dockerfile
     container_name: identity_service
-    ports:
-      - "8085:8085" # Porta exposta para o serviço de identidade
+    # Removendo portas expostas diretamente, agora expostas via nginx
     # volumes:
     #   - ./backend/services/identity-service:/app # Monta o código para desenvolvimento (TEMPORARIAMENTE DESABILITADO PARA TESTE)
     environment:
@@ -19,15 +47,43 @@ services:
       - mongo_db
     networks:
       - gestor_e_docs_net
+      
+  # Serviço de Documentos (GoLang)
+  document-service:
+    build:
+      context: ./backend/services/document-service
+      dockerfile: Dockerfile
+    container_name: document_service
+    # Removendo portas expostas diretamente, agora expostas via nginx
+    expose:
+      - "8185" # Porta exposta apenas na rede interna
+    # volumes:
+    #   - ./backend/services/document-service:/app # Monta o código para desenvolvimento
+    environment:
+      - MONGO_URI=mongodb://mongo_db:27017/gestor_e_docs
+      - JWT_SECRET_KEY=seuSuperSegredoMuitoComplexoAqui
+      - MINIO_ENDPOINT=minioserver:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=documents
+      - PORT=8185
+      - GIN_MODE=debug # Modo de desenvolvimento
+    depends_on:
+      - mongo_db
+      - minio_server
+      - identity-service # Depende do serviço de identidade para autenticação
+    networks:
+      - gestor_e_docs_net
 
   # Frontend (React)
   frontend-app:
     build:
       context: ./frontend/web-app
-      dockerfile: Dockerfile # Será criado na próxima etapa
+      dockerfile: Dockerfile
     container_name: frontend_app
-    ports:
-      - "3085:80" # Mapeia a porta 80 do container para a 3085 do host
+    # Removendo portas expostas diretamente, agora expostas via nginx
+    expose:
+      - "80" # Exposta apenas na rede interna
     volumes:
       - ./frontend/web-app:/app # Monta o código para desenvolvimento
       - /app/node_modules # Evita que node_modules local sobrescreva o do container
@@ -43,8 +99,10 @@ services:
   mongo_db:
     image: mongo:latest
     container_name: mongo_db
+    expose:
+      - "27017"
     ports:
-      - "27017:27017"
+      - "27185:27017" # Mantendo porta externa para acesso direto ao MongoDB # Porta externa padronizada com final 85
     volumes:
       - mongo_data:/data/db # Volume persistente para os dados do MongoDB
     networks:
@@ -54,9 +112,10 @@ services:
   minio_server:
     image: minio/minio:latest
     container_name: minio_server
-    ports:
-      - "9000:9000" # API
-      - "9001:9001" # Console Web
+    # Removendo portas expostas diretamente, agora expostas via nginx
+    expose:
+      - "9000" # API
+      - "9001" # Console Web
     volumes:
       - minio_data:/data
     environment:
@@ -64,11 +123,103 @@ services:
       - MINIO_ROOT_PASSWORD=minioadmin
     command: server /data --console-address ":9001"
     networks:
+      gestor_e_docs_net:
+        aliases:
+          - minio
+          - minioserver
+          - minio-server
+
+  # Elasticsearch para armazenamento e buscas em logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.2.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    ports:
+      - "9285:9200"  # Porta externa padronizada com final 85
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - gestor_e_docs_net
+
+  # Kibana para visualização de logs
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.2.0
+    container_name: kibana
+    ports:
+      - "5685:5601"  # Porta externa padronizada com final 85
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - gestor_e_docs_net
+
+  # Fluentd para coleta de logs
+  fluentd:
+    build:
+      context: ./fluentd
+      dockerfile: Dockerfile
+    container_name: fluentd
+    volumes:
+      - ./fluentd/conf:/fluentd/etc
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    ports:
+      - "24285:24224"  # Porta externa padronizada com final 85
+    depends_on:
+      - elasticsearch
+    networks:
+      - gestor_e_docs_net
+
+  # Prometheus para coleta de métricas
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9385:9090"  # Porta externa padronizada com final 85
+    networks:
+      - gestor_e_docs_net
+
+  # Node Exporter para métricas do sistema
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    expose:
+      - "9100"
+    networks:
+      - gestor_e_docs_net
+
+  # Grafana para visualização de métricas
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=gestor_e_docs_admin
+    ports:
+      - "3385:3000"  # Porta externa padronizada com final 85
+    depends_on:
+      - prometheus
+    networks:
       - gestor_e_docs_net
 
 volumes:
   mongo_data:
   minio_data:
+  elasticsearch_data:
+  grafana_data:
+  prometheus_data:
 
 networks:
   gestor_e_docs_net:
