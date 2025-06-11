@@ -6,12 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	"gestor-e-docs/identity-service/db"
-	"gestor-e-docs/identity-service/models"
-	"gestor-e-docs/identity-service/utils"
+	"gestor-e-docs/backend/services/identity-service/db"
+	"gestor-e-docs/backend/services/identity-service/models"
+	"gestor-e-docs/backend/services/identity-service/utils"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -49,6 +50,9 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 	user.Password = string(hashedPassword)
+	user.Role = "user" // Define o papel padrão
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
 
 	_, err = collection.InsertOne(ctx, user)
 	if err != nil {
@@ -74,6 +78,8 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[AUTH_DEBUG] Login attempt for email: %s", req.Email)
+
 	collection := db.GetCollection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -81,6 +87,9 @@ func LoginUser(c *gin.Context) {
 	var foundUser models.User
 	log.Printf("[LoginUser] Attempting to find user with email: %s", req.Email)
 	err := collection.FindOne(ctx, bson.M{"email": req.Email}).Decode(&foundUser)
+	if err == nil {
+		log.Printf("[AUTH_DEBUG] User found. DB Password Hash: %s", foundUser.Password)
+	}
 	if err == mongo.ErrNoDocuments {
 		log.Printf("[LoginUser] User with email %s not found.", req.Email)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
@@ -92,7 +101,9 @@ func LoginUser(c *gin.Context) {
 	}
 	log.Printf("[LoginUser] User %s found. Verifying password.", req.Email)
 
-	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(req.Password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(req.Password)); err != nil {
+		log.Printf("[AUTH_DEBUG] Password comparison FAILED for email %s. Error: %v", req.Email, err)
+
 		log.Printf("[LoginUser] Password verification failed for user %s: %v", req.Email, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
@@ -164,6 +175,39 @@ func LogoutUser(c *gin.Context) {
 	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
 	log.Printf("[LogoutUser] Cookies removidos com Secure=true e sem restrição de domínio")
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
+}
+
+// RefreshToken renova o access_token usando um refresh_token válido.
+// GetUserProfile busca e retorna os dados do usuário autenticado.
+func GetUserProfile(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+
+	// Convertendo o ID de string para ObjectID
+	objectID, err := primitive.ObjectIDFromHex(userID.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	collection := db.GetCollection("users")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var user models.User
+	if err := collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user); err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
 // RefreshToken renova o access_token usando um refresh_token válido.

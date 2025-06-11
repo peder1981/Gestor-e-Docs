@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"gestor-e-docs/identity-service/utils"
+	"gestor-e-docs/backend/services/identity-service/utils"
 
 	"github.com/gin-gonic/gin"
 )

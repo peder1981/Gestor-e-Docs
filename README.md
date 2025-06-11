@@ -12,6 +12,20 @@ Plataforma web para gerenciamento completo de documentos eletrônicos no formato
 [![Go](https://img.shields.io/badge/Go-1.20+-blue.svg)](https://golang.org/)
 [![React](https://img.shields.io/badge/React-18.2+-blue.svg)](https://reactjs.org/)
 
+### Resumo das Correções e Melhorias (Junho/2025)
+Este projeto passou por uma extensa fase de depuração e refatoração para estabilizar o ambiente e corrigir o fluxo de autenticação. As principais melhorias incluem:
+
+- **Criação de Usuário Admin Confiável**: A lógica de criação do usuário administrador foi integrada diretamente à inicialização do `identity-service`. Isso resolveu um problema crítico de persistência de dados no Docker, eliminando a necessidade de scripts externos (`create-admin-user.go`) e simplificando o Dockerfile.
+
+- **Correção do Fluxo de Autenticação**: O principal bug que impedia o login foi resolvido. O problema era multifacetado:
+  - **Backend**: O endpoint `/me` foi corrigido para retornar o objeto de usuário completo, em vez de apenas uma mensagem de sucesso, que era o que o frontend esperava.
+  - **Frontend**: O cliente de API (`axios`) foi configurado com `withCredentials: true` para garantir que os cookies de autenticação (HttpOnly) fossem enviados em todas as requisições.
+  - **Frontend**: A lógica no `AuthContext` foi refinada para lidar corretamente com a resposta da API, atualizando o estado de autenticação e permitindo o redirecionamento para a página principal após o login.
+
+- **Estabilização do Build**: Foram resolvidos múltiplos erros de build no backend (conflitos de módulos Go, caminhos de importação incorretos) e no frontend (dependências ausentes, erros de lint, importações erradas).
+
+- **Segurança**: O modelo de usuário no backend foi ajustado para nunca expor o hash da senha em respostas JSON (`json:"-"`), e a configuração de cookies HttpOnly foi validada para proteger contra ataques XSS.
+
 ### Tecnologias
 - **Backend**: GoLang (Arquitetura de Microserviços)
 - **Frontend**: React
@@ -19,7 +33,6 @@ Plataforma web para gerenciamento completo de documentos eletrônicos no formato
 - **Armazenamento de Arquivos**: MinIO
 - **Autenticação**: JWT com cookies HttpOnly
 - **Comunicação API**: REST
-- **Conversão de Documentos**: Pandoc
 - **Service Discovery**: DNS interno do Docker
 - **SSL/TLS**: Nginx como proxy reverso seguro
 - **Monitoramento**: Prometheus + Grafana
@@ -53,41 +66,20 @@ O Gestor-e-Docs utiliza um sistema moderno e seguro de autenticação:
 #### Como Executar
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/seu-usuario/gestor-e-docs.git
+   git clone https://github.com/peder1981/Gestor-e-Docs.git
    cd Gestor-e-Docs
    ```
 
-2. Use o script de inicialização (recomendado):
-   ```bash
-   chmod +x start.sh
-   ./start.sh
-   ```
-   
-   Ou inicie os serviços diretamente com Docker Compose:
+2. Inicie os serviços com Docker Compose:
    ```bash
    docker compose up -d --build
    ```
 
 3. Acesse a aplicação:
+   - **Frontend**: [https://localhost](https://localhost)
+   - **Credenciais de Admin**: `admin@example.com` / `password123`
 
-   **Acesso seguro (HTTPS):**
-   - Frontend: https://localhost
-   - API de identidade: https://localhost:8085
-   - API de documentos: https://localhost:8185
-   - Console MinIO: https://localhost:9185 (credenciais: minioadmin/minioadmin)
-   - API MinIO: https://localhost:9085
-   
-   **Monitoramento e Logging:**
-   - Grafana: http://localhost:3385 (credenciais: admin/gestor_e_docs_admin)
-   - Kibana: http://localhost:5685
-   - Elasticsearch: http://localhost:9285
-   - Prometheus: http://localhost:9385
-   
-   **Acesso direto:**
-   - MongoDB: localhost:27185
-   
-   > **Nota:** Os certificados SSL são autoassinados. Para uso em produção, 
-   > substitua por certificados válidos emitidos por uma CA confiável.
+   > **Nota:** Os certificados SSL são autoassinados. Pode ser necessário aceitar o risco de segurança no seu navegador na primeira vez.
 
 ### Estrutura de Diretórios
 ```
@@ -168,9 +160,9 @@ O Gestor-e-Docs utiliza um sistema moderno e seguro de autenticação:
 Contribuições são bem-vindas! Para contribuir com este projeto:
 
 1. Faça um fork do repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
-3. Faça commit das alterações (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Envie para o branch (`git push origin feature/nova-funcionalidade`)
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Faça commit das alterações (`git commit -m 'Adiciona nova feature'`)
+4. Faça o push para a branch (`git push origin feature/nova-feature`)
 5. Abra um Pull Request
 
 #### Padrões de Código
@@ -199,6 +191,20 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 ### Overview
 Web platform for complete management of electronic documents in Markdown format, with features for uploading, secure storage, querying, conversion, and access control.
 
+### Summary of Fixes and Improvements (June 2025)
+This project underwent an extensive debugging and refactoring phase to stabilize the environment and fix the authentication flow. Key improvements include:
+
+- **Reliable Admin User Creation**: The admin user creation logic was integrated directly into the `identity-service` startup. This resolved a critical data persistence issue in Docker, eliminating the need for external scripts (`create-admin-user.go`) and simplifying the Dockerfile.
+
+- **Authentication Flow Fix**: The main bug preventing login has been resolved. The issue was multifaceted:
+  - **Backend**: The `/me` endpoint was fixed to return the full user object instead of just a success message, which the frontend expected.
+  - **Frontend**: The API client (`axios`) was configured with `withCredentials: true` to ensure authentication cookies (HttpOnly) were sent with every request.
+  - **Frontend**: The logic in `AuthContext` was refined to correctly handle the API response, update the authentication state, and allow redirection to the main page after login.
+
+- **Build Stabilization**: Multiple build errors were resolved in the backend (Go module conflicts, incorrect import paths) and frontend (missing dependencies, linting errors, wrong imports).
+
+- **Security**: The user model in the backend was adjusted to never expose the password hash in JSON responses (`json:"-"`), and the HttpOnly cookie configuration was validated to protect against XSS attacks.
+
 ### Technologies
 - **Backend**: GoLang (Microservices Architecture)
 - **Frontend**: React
@@ -206,30 +212,10 @@ Web platform for complete management of electronic documents in Markdown format,
 - **File Storage**: MinIO
 - **Authentication**: JWT with HttpOnly cookies
 - **API Communication**: REST
-- **Document Conversion**: Pandoc
-- **Service Discovery**: Docker internal DNS
-- **SSL/TLS**: Nginx as secure reverse proxy
+- **Service Discovery**: Docker's internal DNS
+- **SSL/TLS**: Nginx as a secure reverse proxy
 - **Monitoring**: Prometheus + Grafana
-- **Log Management**: ELK Stack (Elasticsearch, Kibana) + Fluentd
-
-### Architecture
-The system consists of independent services that communicate via REST API:
-
-- **identity-service**: Responsible for user authentication and authorization
-- **document-service**: Document management, including upload, storage, categorization, and version control
-- **conversion-service** (planned): Conversion between document formats
-- **frontend-app**: Web interface for users
-- **nginx**: Reverse proxy for TLS/SSL and secure access to all services
-- **prometheus + grafana**: Collection, storage, and visualization of metrics
-- **fluentd + elasticsearch + kibana**: Collection, storage, and visualization of logs
-
-### Authentication System
-Gestor-e-Docs uses a modern and secure authentication system:
-
-- **JWT-based authentication** using HttpOnly cookies
-- **XSS protection** by not exposing tokens to JavaScript in the browser
-- **Refresh tokens** for automatic session renewal
-- **CORS** configured to protect against unauthorized access
+- **Log Centralization**: ELK Stack (Elasticsearch, Kibana) + Fluentd
 
 ### Environment Setup
 
@@ -240,115 +226,20 @@ Gestor-e-Docs uses a modern and secure authentication system:
 #### How to Run
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/gestor-e-docs.git
+   git clone https://github.com/peder1981/Gestor-e-Docs.git
    cd Gestor-e-Docs
    ```
 
-2. Use the startup script (recommended):
-   ```bash
-   chmod +x start.sh
-   ./start.sh
-   ```
-   
-   Or start services directly with Docker Compose:
+2. Start the services with Docker Compose:
    ```bash
    docker compose up -d --build
    ```
 
 3. Access the application:
+   - **Frontend**: [https://localhost](https://localhost)
+   - **Admin Credentials**: `admin@example.com` / `password123`
 
-   **Secure access (HTTPS):**
-   - Frontend: https://localhost
-   - Identity API: https://localhost:8085
-   - Document API: https://localhost:8185
-   - MinIO Console: https://localhost:9185 (credentials: minioadmin/minioadmin)
-   - MinIO API: https://localhost:9085
-   
-   **Monitoring and Logging:**
-   - Grafana: http://localhost:3385 (credentials: admin/gestor_e_docs_admin)
-   - Kibana: http://localhost:5685
-   - Elasticsearch: http://localhost:9285
-   - Prometheus: http://localhost:9385
-   
-   **Direct access:**
-   - MongoDB: localhost:27185
-   
-   > **Note:** SSL certificates are self-signed. For production use,
-   > replace with valid certificates issued by a trusted CA.
-
-### Directory Structure
-```
-/
-├── backend/
-│   └── services/
-│       ├── identity-service/   # Go authentication service
-│       └── document-service/   # Go document management service
-├── frontend/
-│   └── web-app/               # React application
-├── docker-compose.yml         # Docker services configuration
-├── nginx/
-│   ├── conf/                  # Reverse proxy configuration
-│   └── logs/                  # Nginx logs
-├── certs/                      # SSL certificates
-├── prometheus/                 # Prometheus configuration
-├── grafana/
-│   └── provisioning/           # Dashboards and datasources
-├── fluentd/
-│   ├── conf/                  # Fluentd configuration
-│   └── Dockerfile              # Custom Fluentd build
-└── start.sh                   # Automated startup script
-```
-
-### Environment Variables
-
-#### Identity Service
-- `MONGO_URI`: MongoDB connection URI (default: "mongodb://mongo_db:27017")
-- `MONGO_DB_NAME`: Database name (default: "gestor_e_docs")
-- `JWT_SECRET_KEY`: Secret key to sign JWT tokens
-
-#### Document Service
-- `MONGO_URI`: Same MongoDB connection URI
-- `MONGO_DB_NAME`: Same database name
-- `JWT_SECRET_KEY`: Same secret key for token validation
-- `MINIO_ENDPOINT`: MinIO endpoint (default: "minio_server:9000")
-- `MINIO_ACCESS_KEY`: MinIO access key (default: "minioadmin")
-- `MINIO_SECRET_KEY`: MinIO secret key (default: "minioadmin")
-- `MINIO_BUCKET_NAME`: Bucket name for document storage (default: "documents")
-- `PORT`: Service port (default: "8185")
-
-#### Monitoring and Logging
-- `GRAFANA_ADMIN_USER`: Grafana admin user (default: "admin")
-- `GRAFANA_ADMIN_PASSWORD`: Grafana admin password (default: "gestor_e_docs_admin")
-- `GRAFANA_PORT`: Grafana access port (default: "3385")
-- `KIBANA_PORT`: Kibana access port (default: "5685")
-- `ELASTICSEARCH_PORT`: Elasticsearch access port (default: "9285")
-- `PROMETHEUS_PORT`: Prometheus access port (default: "9385")
-- `FLUENTD_PORT`: Fluentd log forwarding port (default: "24285")
-
-### Troubleshooting
-
-#### Common Issues
-
-1. **Error `Not supported URL scheme http+docker` when running scripts**
-   - **Cause**: Conflicting Docker environment variables
-   - **Solution**: Use the `start.sh` script which clears variables like `DOCKER_HOST` before execution
-
-2. **Connection error with MinIO**
-   - **Cause**: Hostname resolution issues inside containers
-   - **Solution**: Check the `MINIO_ENDPOINT` value in `.env` and ensure containers are in the same Docker network
-
-3. **Error 401 (Unauthorized) when trying to log in**
-   - **Cause**: Invalid credentials or cookie configuration issues
-   - **Solution**: Check CORS and cookie settings in Nginx and identity-service
-   - **Tip**: Use the registration endpoint to create a new user: `curl -k -X POST -H "Content-Type: application/json" -d '{"name": "Admin", "email": "admin@example.com", "password": "password123", "role": "admin"}' https://localhost/api/v1/identity/register`
-
-4. **Error 502 Bad Gateway in frontend**
-   - **Cause**: Backend services are not running or accessible
-   - **Solution**: Check container status with `docker compose ps` and logs with `docker compose logs identity-service`
-
-5. **Timeout when downloading Go dependencies during build**
-   - **Cause**: DNS or proxy issues on some networks
-   - **Solution**: Rebuild images with `--no-cache` parameter or adjust Dockerfiles to use alternative mirrors
+   > **Note:** The SSL certificates are self-signed. You may need to accept the security risk in your browser on the first visit.
 
 ### Contributing
 
@@ -359,20 +250,6 @@ Contributions are welcome! To contribute to this project:
 3. Commit your changes (`git commit -m 'Add new feature'`)
 4. Push to the branch (`git push origin feature/new-feature`)
 5. Open a Pull Request
-
-#### Code Standards
-
-- **Go**: Follow Go formatting conventions. Use `go fmt` before each commit
-- **React**: Keep components small and reusable
-- **Tests**: Add tests for new or modified functionality
-
-#### Reporting Issues
-
-Use the GitHub Issues section to report bugs or suggest improvements. Please provide:
-- Clear description of the issue
-- Steps to reproduce
-- Expected vs. actual behavior
-- Relevant logs or screenshots
 
 ### License
 

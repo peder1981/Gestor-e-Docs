@@ -78,7 +78,6 @@ MINIO_BUCKET_NAME=documents
 # Portas dos serviços - Todas terminadas em 85 conforme padronização
 IDENTITY_SERVICE_PORT=8085
 DOCUMENT_SERVICE_PORT=8185
-FRONTEND_PORT=3085
 GRAFANA_PORT=3385
 KIBANA_PORT=5685
 ELASTICSEARCH_PORT=9285
@@ -97,6 +96,9 @@ EOF
 fi
 
 # Executar o docker-compose com comando adequado
+echo -e "${YELLOW}Garantindo que a imagem do frontend esteja atualizada...${NC}"
+$DOCKER_COMPOSE build frontend-app
+
 echo -e "${YELLOW}Iniciando os serviços com $DOCKER_COMPOSE...${NC}"
 
 # Tentar executar o comando, lidando com erros comuns
@@ -119,26 +121,38 @@ if ! $DOCKER_COMPOSE up -d --build; then
     fi
 fi
 
-# Verificar se os containers estão rodando
+# Verificar se os containers principais estão rodando
 echo -e "${YELLOW}Verificando status dos serviços...${NC}"
-sleep 5 # Dar tempo para os containers iniciarem
+sleep 8 # Dar um tempo maior para os containers iniciarem
 
-# Use docker diretamente em vez de docker-compose para verificar containers
-CONTAINER_COUNT=$(docker ps --filter "name=identity_service|document_service|frontend_app|mongo_db|minio_server" --format "{{.Names}}" | wc -l)
+# Lista de serviços essenciais para verificar
+ESSENTIAL_SERVICES=("nginx_proxy" "frontend_app" "identity_service" "document_service" "mongo_db" "minio_server")
+FAILED_SERVICES=()
 
-if [ "$CONTAINER_COUNT" -gt 0 ]; then
-    echo -e "${GREEN}Serviços iniciados com sucesso! Containers em execução: $CONTAINER_COUNT${NC}"
+# Espera um pouco para garantir que o docker compose ps tenha a informação mais recente
+sleep 2
+
+for service in "${ESSENTIAL_SERVICES[@]}"; do
+    # Verifica se o container está com o status 'running'
+    status=$($DOCKER_COMPOSE ps --status=running | grep "$service")
+    if [ -z "$status" ]; then
+        FAILED_SERVICES+=("$service")
+    fi
+done
+
+if [ ${#FAILED_SERVICES[@]} -eq 0 ]; then
+    echo -e "${GREEN}Serviços essenciais iniciados com sucesso!${NC}"
     
     # Exibir URLs de acesso
     echo -e "\n${GREEN}=== Acesso ao Sistema ===${NC}"
-    echo -e "\n${YELLOW}Acesso Seguro (HTTPS):${NC}"
-    echo -e "Frontend: ${GREEN}https://localhost${NC}"
-    echo -e "API Identity Service: ${GREEN}https://localhost:8085${NC}"
-    echo -e "API Document Service: ${GREEN}https://localhost:8185${NC}"
+    echo -e "\n${YELLOW}Acesso Principal (via Proxy Reverso com HTTPS):${NC}"
+    echo -e "Interface Gráfica (Frontend): ${GREEN}https://localhost${NC}"
     echo -e "MinIO Console: ${GREEN}https://localhost:9185${NC}"
-    echo -e "MinIO API: ${GREEN}https://localhost:9085${NC}"
     
-    echo -e "\n${YELLOW}Acesso Direto (HTTP, sem proxy/SSL):${NC}"
+    echo -e "\n${YELLOW}Acesso direto aos serviços (para depuração):${NC}"
+    echo -e "API Identity (HTTPS direto): ${GREEN}https://localhost:8085${NC}"
+    echo -e "API Document (HTTPS direto): ${GREEN}https://localhost:8185${NC}"
+    echo -e "MinIO API (HTTPS direto): ${GREEN}https://localhost:9085${NC}"
     echo -e "MongoDB: ${GREEN}localhost:27185${NC}"
     
     echo -e "\n${YELLOW}Monitoramento e Logging:${NC}"
@@ -152,14 +166,17 @@ if [ "$CONTAINER_COUNT" -gt 0 ]; then
     echo -e "Grafana: admin / gestor_e_docs_admin"
     
     echo -e "\n${YELLOW}IMPORTANTE: Os certificados SSL são autoassinados.${NC}"
-    echo -e "Navegadores podem exibir alertas de segurança. Para uso em produção,"
-    echo -e "substitua por certificados válidos emitidos por uma CA confiável."
+    echo -e "Seu navegador exibirá um alerta de segurança. Você pode aceitá-lo para continuar."
     
-    echo -e "\n${YELLOW}Para parar os serviços, execute: docker compose down${NC}"
+    echo -e "\n${YELLOW}Para parar os serviços, execute: $DOCKER_COMPOSE down${NC}"
 else
-    echo -e "${RED}Erro ao iniciar os serviços! Verifique os logs:${NC}"
-    docker logs identity_service 2>/dev/null || echo "Container identity_service não encontrado"
-    docker logs document_service 2>/dev/null || echo "Container document_service não encontrado"
+    echo -e "${RED}Erro! Os seguintes serviços essenciais falharam ao iniciar ou não estão rodando:${NC}"
+    for service in "${FAILED_SERVICES[@]}"; do
+        echo -e "${RED}- $service${NC}"
+    done
+    echo -e "${YELLOW}Verifique os logs dos contêineres com falha usando: $DOCKER_COMPOSE logs [nome_do_serviço]${NC}"
+    echo -e "${YELLOW}Exibindo logs completos para diagnóstico...${NC}"
+    $DOCKER_COMPOSE logs
 fi
 
 echo -e "\n${GREEN}=== Fim do Script ===${NC}"

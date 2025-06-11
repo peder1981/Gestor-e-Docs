@@ -1,4 +1,4 @@
-module admin-user-script
+module gestor-e-docs
 
 go 1.24.2
 

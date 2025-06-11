@@ -1,41 +1,41 @@
-# Etapa de build
-FROM golang:1.23-alpine AS builder
+# Etapa 1: Builder
+FROM golang:1.24.2 AS builder
 
 WORKDIR /app
 
-# Limpar cache de módulos Go explicitamente
-RUN go clean -modcache
+# Copiar os arquivos de módulo primeiro para aproveitar o cache do Docker
+COPY go.mod go.sum ./
 
-# Copiar arquivos de dependências e baixar dependências
-COPY go.mod go.sum* ./
+# Baixar as dependências
 RUN go mod download
 
-# Copiar o código fonte
+# Copiar todo o código fonte para o contexto de build
 COPY . .
 
-# Garantir que go.mod e go.sum estejam corretos ANTES do build,
-# baseado em todas as importações no código copiado:
+# Garantir que o go.sum está perfeitamente sincronizado com o código.
+# Isso resolve os erros de "missing go.sum entry".
 RUN go mod tidy
 
-# Construir a aplicação
-# CGO_ENABLED=0 para um binário estático, GOOS=linux para cross-compilation (se necessário, mas alpine é linux)
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o identity-service .
+# Compilar o binário principal do serviço
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/identity-service /app/backend/services/identity-service/main.go
 
-# Etapa final - imagem leve
+# Voltar para o WORKDIR /app se precisar fazer mais algo no root do builder (opcional aqui)
+WORKDIR /app
+
+# Etapa 2: Imagem final leve
 FROM alpine:latest
 
-WORKDIR /root/
+WORKDIR /app/
 
-# Copiar o binário construído da etapa anterior
+# Copiar os binários da etapa de build
 COPY --from=builder /app/identity-service .
 
-# Copiar quaisquer outros assets necessários (ex: templates, configs), se houver
-# COPY --from=builder /app/templates ./templates
+# Copiar o script de entrypoint
+COPY backend/services/identity-service/entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-# Expor a porta que a aplicação vai rodar
-# A porta real é definida pela variável de ambiente SERVICE_PORT ou padrão 8085 no código
-# O docker-compose mapeia a porta do host para esta porta do container
+# Expor a porta do serviço
 EXPOSE 8085
 
-# Comando para rodar a aplicação
-CMD ["./identity-service"]
+# Definir o entrypoint para executar o script de inicialização
+ENTRYPOINT ["./entrypoint.sh"]
