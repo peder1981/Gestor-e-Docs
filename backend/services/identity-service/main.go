@@ -80,19 +80,38 @@ func main() {
 
 	// Configuração do CORS
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{
-		"http://localhost:3085",
-		"http://localhost",
-		"http://localhost:80",
-		"http://127.0.0.1:3085",
-		"http://127.0.0.1",
-		"http://127.0.0.1:33023", // Adicionar porta do proxy temporário para testes
-	}
+	// Permitir apenas https://localhost em produção
+	config.AllowOrigins = []string{"https://localhost"}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
-	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept"}
-	config.AllowCredentials = true
-	config.ExposeHeaders = []string{"Content-Length", "Set-Cookie"}
+	config.AllowHeaders = []string{
+		"Origin",
+		"Content-Length",
+		"Content-Type",
+		"Authorization",
+		"Accept",
+		"Cookie",
+		"X-CSRF-Token",
+		"X-Requested-With",
+	}
+	config.AllowCredentials = true // Essencial para cookies
+	config.ExposeHeaders = []string{
+		"Content-Length",
+		"Content-Type",
+		"Set-Cookie",
+		"Access-Control-Allow-Origin",
+		"Access-Control-Allow-Credentials",
+	}
 	config.MaxAge = 12 * time.Hour
+
+	// Modo de desenvolvimento: permitir HTTP
+	if gin.Mode() != gin.ReleaseMode {
+		config.AllowOrigins = append(config.AllowOrigins,
+			"http://localhost",
+			"http://localhost:3085",
+			"http://127.0.0.1",
+		)
+	}
+
 	r.Use(cors.New(config))
 
 	// Rota de health check

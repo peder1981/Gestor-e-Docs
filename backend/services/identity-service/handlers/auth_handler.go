@@ -111,6 +111,7 @@ func LoginUser(c *gin.Context) {
 
 	log.Printf("[LoginUser] User %s authenticated successfully. Generating tokens...", req.Email)
 
+	// Gera os tokens
 	accessToken, err := utils.GenerateAccessToken(foundUser.ID.Hex())
 	if err != nil {
 		log.Printf("[LoginUser] Error generating access token for user %s: %v", req.Email, err)
@@ -125,37 +126,54 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[LoginUser] Tokens generated successfully for user %s. Setting cookies.", req.Email)
+	// Define os cookies com configurações mais permissivas para desenvolvimento
+	isSecure := os.Getenv("GIN_MODE") == "release"
+	log.Printf("[LoginUser] Setting cookies with Secure=%v for user %s", isSecure, req.Email)
 
-	// Definir os cookies HTTP-only
-	// Para desenvolvimento (HTTP), Secure deve ser false. Em produção (HTTPS), deve ser true.
-	// Como estamos usando HTTPS, Secure pode ser sempre true.
-	// SameSite=None requer que Secure seja true.
+	// Define o cookie de access token
 	accessTokenCookie := http.Cookie{
 		Name:     "access_token",
 		Value:    accessToken,
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
-		// Removendo Domain para aceitar qualquer domínio
-		Secure:   true, // Necessário para HTTPS
+		Secure:   isSecure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
+
+	// Log detalhado do cookie de access token
+	log.Printf("[LoginUser] Setting access_token cookie: {Name: %s, Path: %s, Secure: %v, HttpOnly: %v, SameSite: %v}",
+		accessTokenCookie.Name,
+		accessTokenCookie.Path,
+		accessTokenCookie.Secure,
+		accessTokenCookie.HttpOnly,
+		accessTokenCookie.SameSite)
+
 	http.SetCookie(c.Writer, &accessTokenCookie)
 
+	// Define o cookie de refresh token
 	refreshTokenCookie := http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		MaxAge:   7 * 24 * 60 * 60, // 7 dias
 		Path:     "/",
-		// Removendo Domain para aceitar qualquer domínio
-		Secure:   true, // Necessário para HTTPS
+		Secure:   isSecure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
+
+	// Log detalhado do cookie de refresh token
+	log.Printf("[LoginUser] Setting refresh_token cookie: {Name: %s, Path: %s, Secure: %v, HttpOnly: %v, SameSite: %v}",
+		refreshTokenCookie.Name,
+		refreshTokenCookie.Path,
+		refreshTokenCookie.Secure,
+		refreshTokenCookie.HttpOnly,
+		refreshTokenCookie.SameSite)
+
 	http.SetCookie(c.Writer, &refreshTokenCookie)
 
-	log.Printf("[LoginUser] Cookies definidos com Secure=true e sem restrição de domínio para usuário %s", req.Email)
+	// Log dos headers da resposta para depuração
+	log.Printf("[LoginUser] Response headers: %+v", c.Writer.Header())
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -171,8 +189,9 @@ func LoginUser(c *gin.Context) {
 func LogoutUser(c *gin.Context) {
 	// Define os cookies com MaxAge -1 para instruir o navegador a excluí-los
 	// Removendo Domain e configurando Secure=true para consistência
-	c.SetCookie("access_token", "", -1, "/", "", true, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+	isSecure := os.Getenv("GIN_MODE") == "release"
+	c.SetCookie("access_token", "", -1, "/", "", isSecure, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", isSecure, true)
 	log.Printf("[LogoutUser] Cookies removidos com Secure=true e sem restrição de domínio")
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
@@ -247,7 +266,7 @@ func RefreshToken(c *gin.Context) {
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
 		// Removendo Domain para aceitar qualquer domínio
-		Secure:   true, // Necessário para HTTPS
+		Secure:   os.Getenv("GIN_MODE") == "release", // Secure apenas em produção
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}
