@@ -78,11 +78,27 @@ func main() {
 
 	r := gin.Default()
 
+	// Middleware para tratar requisições HEAD
+	r.Use(func(c *gin.Context) {
+		if c.Request.Method == "HEAD" {
+			// Permitir que o Gin continue o processamento da rota
+			// Se a rota existir, será processada normalmente
+			// Se não existir, o Gin retornará 404 automaticamente
+			c.Request.Method = "GET"
+		}
+		c.Next()
+	})
+
 	// Configuração do CORS
 	config := cors.DefaultConfig()
-	// Permitir apenas https://localhost em produção
-	config.AllowOrigins = []string{"https://localhost"}
-	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	// Permitir localhost em produção e desenvolvimento
+	config.AllowOrigins = []string{
+		"https://localhost",
+		"http://localhost",
+		"http://127.0.0.1",
+		"http://localhost:3085",
+	}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
 	config.AllowHeaders = []string{
 		"Origin",
 		"Content-Length",
@@ -103,15 +119,6 @@ func main() {
 	}
 	config.MaxAge = 12 * time.Hour
 
-	// Modo de desenvolvimento: permitir HTTP
-	if gin.Mode() != gin.ReleaseMode {
-		config.AllowOrigins = append(config.AllowOrigins,
-			"http://localhost",
-			"http://localhost:3085",
-			"http://127.0.0.1",
-		)
-	}
-
 	r.Use(cors.New(config))
 
 	// Rota de health check
@@ -127,10 +134,17 @@ func main() {
 			public.GET("/", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{"message": "Identity Service v1"})
 			})
+			// Rotas POST principais
 			public.POST("/register", handlers.RegisterUser)
 			public.POST("/login", handlers.LoginUser)
 			public.POST("/logout", handlers.LogoutUser)
 			public.POST("/refresh", handlers.RefreshToken) // Rota de refresh é pública
+
+			// Handlers HEAD para CORS/preflight
+			public.HEAD("/register", handlers.HeadHandler)
+			public.HEAD("/login", handlers.HeadHandler)
+			public.HEAD("/logout", handlers.HeadHandler)
+			public.HEAD("/refresh", handlers.HeadHandler)
 		}
 
 		protected := apiV1.Group("")

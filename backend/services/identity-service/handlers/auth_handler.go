@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"gestor-e-docs/backend/services/identity-service/db"
@@ -16,6 +17,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// HeadHandler é um handler genérico para requisições HEAD
+// Retorna apenas os headers necessários para CORS/preflight
+func HeadHandler(c *gin.Context) {
+	c.Status(http.StatusOK)
+}
 
 // RegisterUser registra um novo usuário no sistema
 func RegisterUser(c *gin.Context) {
