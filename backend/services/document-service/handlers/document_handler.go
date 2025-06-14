@@ -5,8 +5,10 @@ import (
 	"gestor-e-docs/document-service/db"
 	"gestor-e-docs/document-service/models"
 	"gestor-e-docs/document-service/storage"
+	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,42 +25,76 @@ func CreateDocument(c *gin.Context) {
 		return
 	}
 
-	// Parse do corpo da requisição
-	var docRequest models.DocumentCreate
-	if err := c.ShouldBindJSON(&docRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// Processar o arquivo enviado via multipart/form-data
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Formato inválido. Esperado multipart/form-data"})
 		return
 	}
 
-	// Garantir que o AuthorID seja o userID da sessão
-	docRequest.AuthorID = userID.(string)
+	// Verificar se há arquivos no form
+	files := form.File["files"]
+	if len(files) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nenhum arquivo enviado"})
+		return
+	}
 
-	// Criar um novo documento com base nos dados recebidos
+	// Por enquanto, vamos processar apenas o primeiro arquivo
+	file := files[0]
+
+	// Verificar extensão do arquivo
+	if !strings.HasSuffix(strings.ToLower(file.Filename), ".md") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Apenas arquivos .md são permitidos"})
+		return
+	}
+
+	// Abrir o arquivo
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao processar arquivo"})
+		return
+	}
+	defer src.Close()
+
+	// Ler o conteúdo do arquivo
+	content, err := io.ReadAll(src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao ler arquivo"})
+		return
+	}
+
+	// Extrair outros campos do form
+	description := form.Value["description"][0] // Campo opcional
+	title := strings.TrimSuffix(file.Filename, ".md") // Usar nome do arquivo como título por padrão
+
+	// Criar um novo documento
 	now := time.Now()
 	newDoc := models.Document{
-		Title:      docRequest.Title,
-		Content:    docRequest.Content,
-		AuthorID:   docRequest.AuthorID,
+		Title:      title,
+		Content:    string(content),
+		AuthorID:   userID.(string),
 		CreatedAt:  now,
 		UpdatedAt:  now,
-		Tags:       docRequest.Tags,
-		Categories: docRequest.Categories,
+		Tags:       []string{},
+		Categories: []string{},
 		Status:     models.StatusDraft,
 		Permissions: models.DocumentPermissions{
-			OwnerID:  docRequest.AuthorID,
-			IsPublic: docRequest.IsPublic,
+			OwnerID:  userID.(string),
+			IsPublic: false,
 			ReadAccess: []string{},
 			WriteAccess: []string{},
 			AdminAccess: []string{},
 		},
 		Metadata: models.DocumentMetadata{
-			FileSize:          int64(len(docRequest.Content)),
+			FileSize:          file.Size,
 			OriginalExtension: "md",
 			LastViewedAt:      now,
 			ViewCount:         0,
 			IsTemplate:        false,
 			Keywords:          []string{},
-			CustomFields:      map[string]interface{}{},
+			CustomFields: map[string]interface{}{
+				"description": description,
+			},
 		},
 	}
 
@@ -73,8 +109,8 @@ func CreateDocument(c *gin.Context) {
 	// Criar um ID temporário para o documento enquanto não temos o ID do MongoDB
 	tempID := primitive.NewObjectID().Hex()
 	objectPath, err := minioClient.UploadDocument(
-		[]byte(docRequest.Content),
-		docRequest.AuthorID,
+		content,
+		userID.(string),
 		tempID,
 		"text/markdown",
 	)

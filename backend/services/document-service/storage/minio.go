@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,7 +38,8 @@ func GetMinioClient() (*MinioClient, error) {
 	accessKeyID := os.Getenv("MINIO_ACCESS_KEY")
 	secretAccessKey := os.Getenv("MINIO_SECRET_KEY")
 	bucketName := os.Getenv("MINIO_BUCKET_NAME")
-	useSSL := false
+	// Usar SSL quando o endpoint for localhost (onde o Nginx termina SSL)
+	useSSL := strings.HasPrefix(endpoint, "localhost:") || strings.HasPrefix(endpoint, "127.0.0.1:")
 
 	// Valores padrão para desenvolvimento local
 	if endpoint == "" {
