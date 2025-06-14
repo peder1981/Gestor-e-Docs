@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
+	"context"
 	"gestor-e-docs/backend/services/identity-service/db"
 	"gestor-e-docs/backend/services/identity-service/handlers"
-	"context"
-
+	"gestor-e-docs/backend/services/identity-service/metrics"
 	"gestor-e-docs/backend/services/identity-service/models"
 
 	"github.com/gin-contrib/cors"
@@ -76,7 +76,13 @@ func main() {
 	// Garante que o usuário administrador exista
 	ensureAdminUserExists()
 
+	// Inicializar métricas do Prometheus
+	metrics.Init()
+
 	r := gin.Default()
+
+	// Adicionar middleware de métricas do Prometheus
+	r.Use(metrics.PrometheusMiddleware())
 
 	// Middleware para tratar requisições HEAD
 	r.Use(func(c *gin.Context) {
@@ -125,6 +131,9 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "UP"})
 	})
+
+	// Endpoint de métricas do Prometheus
+	r.GET("/metrics", metrics.PrometheusHandler())
 
 	// Rota de API V1 - placeholder
 	apiV1 := r.Group("/api/v1/identity")

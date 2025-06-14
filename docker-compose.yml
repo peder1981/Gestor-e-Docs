@@ -12,12 +12,14 @@ services:
       - "443:443"  # HTTPS para frontend
       - "8085:8085" # API Identity
       - "8185:8185" # API Document
+      - "8285:8285" # API Conversion
       - "9085:9085" # MinIO API
       - "9185:9185" # MinIO Console
     depends_on:
       - frontend-app
       - identity-service
       - document-service
+      - conversion-service
       - minio_server
     networks:
       - gestor_e_docs_net
@@ -212,6 +214,49 @@ services:
       - "3385:3000"  # Porta externa padronizada com final 85
     depends_on:
       - prometheus
+    networks:
+      - gestor_e_docs_net
+
+  # Serviço de Conversão de Documentos (GoLang)
+  conversion-service:
+    build:
+      context: ./backend/services/conversion-service
+      dockerfile: Dockerfile
+    container_name: conversion_service
+    expose:
+      - "8285" # Porta exposta apenas na rede interna
+    environment:
+      - JWT_SECRET_KEY=seuSuperSegredoMuitoComplexoAqui
+      - PORT=8285
+      - GIN_MODE=debug # Modo de desenvolvimento
+      - GOTENBERG_API_URL=http://gotenberg:3000
+    depends_on:
+      - identity-service # Depende do serviço de identidade para autenticação
+      - gotenberg # Depende do Gotenberg para conversão de documentos
+    networks:
+      - gestor_e_docs_net
+
+  # Serviço Gotenberg para conversão de documentos
+  gotenberg:
+    image: gotenberg/gotenberg:7.8
+    container_name: gotenberg
+    expose:
+      - "3000" # Porta exposta apenas na rede interna
+    environment:
+      - DISABLE_GOOGLE_CHROME=0
+    networks:
+      - gestor_e_docs_net
+
+  # Nginx Exporter para métricas do Nginx
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx_exporter
+    expose:
+      - "9113" # Porta exposta apenas na rede interna
+    command:
+      - -nginx.scrape-uri=http://nginx_proxy:8080/stub_status
+    depends_on:
+      - nginx
     networks:
       - gestor_e_docs_net
 
