@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"context"
@@ -95,14 +96,22 @@ func main() {
 		c.Next()
 	})
 
-	// Configuração do CORS
+	// Configuração do CORS baseada em variáveis de ambiente
 	config := cors.DefaultConfig()
-	// Permitir localhost em produção e desenvolvimento
-	config.AllowOrigins = []string{
-		"https://localhost",
-		"http://localhost",
-		"http://127.0.0.1",
-		"http://localhost:3085",
+	
+	// Obter origens permitidas do ambiente ou usar padrões de desenvolvimento
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		// Em desenvolvimento, permitir localhost em várias portas
+		config.AllowOrigins = []string{
+			"https://localhost",
+			"http://localhost",
+			"http://127.0.0.1",
+			"http://localhost:3085",
+		}
+	} else {
+		// Em produção, usar as origens configuradas
+		config.AllowOrigins = strings.Split(allowedOrigins, ",")
 	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
 	config.AllowHeaders = []string{

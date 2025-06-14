@@ -46,6 +46,8 @@ services:
       - JWT_SECRET_KEY=seuSuperSegredoMuitoComplexoAqui
       - SERVICE_PORT=8085
       - GIN_MODE=debug # Garante que estamos em modo de desenvolvimento
+      - ALLOWED_ORIGINS=https://localhost,http://localhost,http://localhost:3085
+      - COOKIE_SAMESITE_STRICT=false # Usar SameSite=Lax para melhor compatibilidade
     depends_on:
       - mongo_db
     networks:

@@ -118,6 +118,12 @@ func LoginUser(c *gin.Context) {
 
 	log.Printf("[LoginUser] User %s authenticated successfully. Generating tokens...", req.Email)
 
+	// Determinar o modo SameSite com base no ambiente
+	sameSiteMode := http.SameSiteLaxMode // Padrão mais permissivo
+	if os.Getenv("COOKIE_SAMESITE_STRICT") == "true" {
+		sameSiteMode = http.SameSiteStrictMode
+	}
+
 	// Gera os tokens
 	accessToken, err := utils.GenerateAccessToken(foundUser.ID.Hex())
 	if err != nil {
@@ -143,9 +149,10 @@ func LoginUser(c *gin.Context) {
 		Value:    accessToken,
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
-		Secure:   isSecure,
+		Domain:   "", // Vazio para usar o domínio atual
+		Secure:   true, // Sempre true pois usamos HTTPS via Nginx
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSiteMode, // Usar a mesma configuração dinâmica do refresh_token
 	}
 
 	// Log detalhado do cookie de access token
@@ -159,28 +166,50 @@ func LoginUser(c *gin.Context) {
 	http.SetCookie(c.Writer, &accessTokenCookie)
 
 	// Define o cookie de refresh token
+	log.Printf("[LoginUser] Configurando cookie refresh_token com SameSite=%v", sameSiteMode)
 	refreshTokenCookie := http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		MaxAge:   7 * 24 * 60 * 60, // 7 dias
 		Path:     "/",
-		Secure:   isSecure,
+		Domain:   "", // Vazio para usar o domínio atual
+		Secure:   true, // Sempre true pois usamos HTTPS via Nginx
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSiteMode, // Usar o mesmo modo do access_token
 	}
+	log.Printf("[LoginUser] Cookie refresh_token configurado: Domain=%q, Path=%q, Secure=%v, HttpOnly=%v", refreshTokenCookie.Domain, refreshTokenCookie.Path, refreshTokenCookie.Secure, refreshTokenCookie.HttpOnly)
 
 	// Log detalhado do cookie de refresh token
-	log.Printf("[LoginUser] Setting refresh_token cookie: {Name: %s, Path: %s, Secure: %v, HttpOnly: %v, SameSite: %v}",
+	log.Printf("[LoginUser] Setting refresh_token cookie: {Name: %s, Path: %s, Domain: %s, Secure: %v, HttpOnly: %v, SameSite: %v}",
 		refreshTokenCookie.Name,
 		refreshTokenCookie.Path,
+		refreshTokenCookie.Domain,
 		refreshTokenCookie.Secure,
 		refreshTokenCookie.HttpOnly,
 		refreshTokenCookie.SameSite)
 
+	// Log dos headers da requisição
+	log.Printf("[LoginUser] Método da requisição: %s", c.Request.Method)
+	log.Printf("[LoginUser] URL da requisição: %s", c.Request.URL.String())
+	log.Printf("[LoginUser] Protocolo: %s", c.Request.Proto)
+	log.Printf("[LoginUser] RemoteAddr: %s", c.Request.RemoteAddr)
+	log.Printf("[LoginUser] Todos os headers da requisição: %v", c.Request.Header)
+	log.Printf("[LoginUser] Headers específicos: Origin=%s, Referer=%s, X-Forwarded-Proto=%s, X-Real-IP=%s, X-Forwarded-For=%s",
+		c.Request.Header.Get("Origin"),
+		c.Request.Header.Get("Referer"),
+		c.Request.Header.Get("X-Forwarded-Proto"),
+		c.Request.Header.Get("X-Real-IP"),
+		c.Request.Header.Get("X-Forwarded-For"))
+
 	http.SetCookie(c.Writer, &refreshTokenCookie)
 
 	// Log dos headers da resposta para depuração
-	log.Printf("[LoginUser] Response headers: %+v", c.Writer.Header())
+	log.Printf("[LoginUser] Response headers: Access-Control-Allow-Origin=%s, Access-Control-Allow-Credentials=%s",
+		c.Writer.Header().Get("Access-Control-Allow-Origin"),
+		c.Writer.Header().Get("Access-Control-Allow-Credentials"))
+
+	// Log dos cookies definidos na resposta
+	log.Printf("[LoginUser] Set-Cookie headers: %v", c.Writer.Header()["Set-Cookie"])
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -195,10 +224,9 @@ func LoginUser(c *gin.Context) {
 // LogoutUser invalida os cookies de autenticação do usuário
 func LogoutUser(c *gin.Context) {
 	// Define os cookies com MaxAge -1 para instruir o navegador a excluí-los
-	// Removendo Domain e configurando Secure=true para consistência
-	isSecure := os.Getenv("GIN_MODE") == "release"
-	c.SetCookie("access_token", "", -1, "/", "", isSecure, true)
-	c.SetCookie("refresh_token", "", -1, "/", "", isSecure, true)
+	// Mantendo a mesma configuração dos cookies usada no login
+	c.SetCookie("access_token", "", -1, "/", "", true, true)
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
 	log.Printf("[LogoutUser] Cookies removidos com Secure=true e sem restrição de domínio")
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
@@ -266,19 +294,45 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// Como estamos usando HTTPS, Secure deve ser true.
+	// Determinar o modo SameSite com base no ambiente
+	sameSiteMode := http.SameSiteLaxMode // Padrão mais permissivo
+	if os.Getenv("COOKIE_SAMESITE_STRICT") == "true" {
+		sameSiteMode = http.SameSiteStrictMode
+	}
+
+	// Como estamos usando HTTPS via Nginx, sempre definimos Secure como true
+	log.Printf("[RefreshToken] Configurando cookie access_token com SameSite=%v", sameSiteMode)
 	newAccessTokenCookie := http.Cookie{
 		Name:     "access_token",
 		Value:    newAccessToken,
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
-		// Removendo Domain para aceitar qualquer domínio
-		Secure:   os.Getenv("GIN_MODE") == "release", // Secure apenas em produção
+		Domain:   "", // Vazio para usar o domínio atual
+		Secure:   true, // Sempre true pois usamos HTTPS via Nginx
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSiteMode,
 	}
+	log.Printf("[RefreshToken] Cookie access_token configurado: Domain=%q, Path=%q, Secure=%v, HttpOnly=%v", newAccessTokenCookie.Domain, newAccessTokenCookie.Path, newAccessTokenCookie.Secure, newAccessTokenCookie.HttpOnly)
 	http.SetCookie(c.Writer, &newAccessTokenCookie)
-	log.Printf("[RefreshToken] Cookie de access token atualizado com Secure=true e sem restrição de domínio")
+	log.Printf("[RefreshToken] Cookie de access token atualizado: Domain=%q, Path=%q, Secure=%v, HttpOnly=%v, SameSite=%v",
+		newAccessTokenCookie.Domain,
+		newAccessTokenCookie.Path,
+		newAccessTokenCookie.Secure,
+		newAccessTokenCookie.HttpOnly,
+		newAccessTokenCookie.SameSite)
+
+	// Log dos headers da requisição
+	log.Printf("[RefreshToken] Request headers: Origin=%s, Referer=%s",
+		c.Request.Header.Get("Origin"),
+		c.Request.Header.Get("Referer"))
+
+	// Log dos headers da resposta
+	log.Printf("[RefreshToken] Response headers: Access-Control-Allow-Origin=%s, Access-Control-Allow-Credentials=%s",
+		c.Writer.Header().Get("Access-Control-Allow-Origin"),
+		c.Writer.Header().Get("Access-Control-Allow-Credentials"))
+
+	// Log dos cookies definidos na resposta
+	log.Printf("[RefreshToken] Set-Cookie headers: %v", c.Writer.Header()["Set-Cookie"])
 
 	log.Printf("[RefreshToken] New access token generated and set for user %s.", claims.Subject)
 	c.JSON(http.StatusOK, gin.H{"message": "Access token refreshed successfully"})
