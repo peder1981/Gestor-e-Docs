@@ -36,7 +36,6 @@ yarn-error.log*
 # Dependências Go
 /backend/services/*/vendor/
 /backend/services/*/.idea/
-/backend/services/*/go.sum
 
 # Arquivos de testes
 /frontend/web-app/coverage/
