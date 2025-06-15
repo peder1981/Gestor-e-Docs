@@ -390,11 +390,6 @@ func DownloadDocument(c *gin.Context) {
 	versionStr := c.Query("version")
 	objectPath := doc.StoragePath
 
-	if versionStr != "" {
-		// Se foi solicitada uma versão específica
-		// Aqui deveria ter lógica para determinar o caminho da versão específica
-		// Por simplicidade, estou ignorando este caso
-	}
 
 	// Gerar URL para download
 	minioClient, err := storage.GetMinioClient()
