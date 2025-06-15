@@ -113,9 +113,6 @@ func LoginUser(c *gin.Context) {
 	var foundUser models.User
 	log.Printf("[LoginUser] Attempting to find user with email: %s", req.Email)
 	err := collection.FindOne(ctx, bson.M{"email": req.Email}).Decode(&foundUser)
-	if err == nil {
-
-	}
 	if err == mongo.ErrNoDocuments {
 		log.Printf("[LoginUser] User with email %s not found.", req.Email)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
