@@ -75,13 +75,20 @@ func RegisterUser(c *gin.Context) {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
-	_, err = collection.InsertOne(ctx, user)
+	result, err := collection.InsertOne(ctx, user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully", "userId": user.ID})
+	// Captura o ID gerado pelo MongoDB
+	insertedID, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get inserted user ID"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully", "userId": insertedID.Hex()})
 }
 
 // LoginRequest define a estrutura esperada para o corpo da requisição de login

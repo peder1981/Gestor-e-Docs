@@ -39,10 +39,6 @@ Este documento apresenta o roadmap de desenvolvimento da plataforma **Gestor-e-D
 - ✅ **ELK Stack** - Elasticsearch + Kibana para logs
 - ✅ **Fluentd** - Centralização de logs
 
----
-
-## 🚧 **EM DESENVOLVIMENTO - v1.1 (Q3 2025)**
-
 ### **Conversion Service**
 - ✅ **conversion-service** - Microserviço para conversão de documentos
   - **Prioridade**: Alta
@@ -55,10 +51,18 @@ Este documento apresenta o roadmap de desenvolvimento da plataforma **Gestor-e-D
     - Validação de formato de entrada
     - Queue de processamento assíncrono
 
+---
+
+## ✅ **CONCLUÍDO - v1.1 (Q2 2025)**
+
 ### **Melhorias de Segurança**
-- 🔄 **Rate Limiting** - Proteção contra ataques de força bruta
-- 🔄 **Auditoria** - Log de ações dos usuários
-- 🔄 **2FA (Two-Factor Authentication)** - Autenticação em duas etapas
+- ✅ **Rate Limiting** - Proteção contra ataques de força bruta
+- ✅ **Auditoria** - Log de ações dos usuários
+- ✅ **2FA (Two-Factor Authentication)** - Autenticação em duas etapas
+
+### **Consolidação de Bancos de Dados**
+- ✅ **Unificação do MongoDB** - Migração de todas as coleções para um único banco de dados `gestor_e_docs`
+- ✅ **Correção de bugs** - Resolução de problemas com persistência de dados e comunicação entre serviços
 
 ---
 

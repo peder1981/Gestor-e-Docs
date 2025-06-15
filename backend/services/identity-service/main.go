@@ -12,6 +12,7 @@ import (
 	"gestor-e-docs/backend/services/identity-service/handlers"
 	"gestor-e-docs/backend/services/identity-service/metrics"
 	"gestor-e-docs/backend/services/identity-service/models"
+	"gestor-e-docs/backend/services/identity-service/security"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,23 @@ func main() {
 
 	// Inicializar métricas do Prometheus
 	metrics.Init()
+	
+	// Inicializar o serviço de autenticação de dois fatores
+	handlers.InitTwoFactorAuth()
+	
+	// Inicializar o log de auditoria
+	auditLogger := security.NewAuditLogger(db.GetCollection("audit_logs"), true, true)
+	
+	// Inicializar os rate limiters
+	// Usar limiters pré-configurados do pacote security
+	// Limitador global já está configurado para 60 requisições por minuto por IP
+	globalLimiter := security.GetGlobalLimiter()
+	
+	// Limitador para autenticação configurado para 5 tentativas por minuto por IP
+	authLimiter := security.GetAuthLimiter()
+	
+	// Limitador para operações sensíveis configurado para 10 operações por minuto por usuário
+	sensitiveLimiter := security.GetSensitiveLimiter()
 
 	r := gin.Default()
 
@@ -135,6 +153,9 @@ func main() {
 	config.MaxAge = 12 * time.Hour
 
 	r.Use(cors.New(config))
+	
+	// Adiciona o middleware de rate limiting global em todas as rotas
+	r.Use(globalLimiter.RateLimitMiddleware())
 
 	// Rota de health check
 	r.GET("/health", func(c *gin.Context) {
@@ -146,15 +167,18 @@ func main() {
 
 	// Rota de API V1 - placeholder
 	apiV1 := r.Group("/api/v1/identity")
+	
+	// Adicionar middleware de auditoria a todas as rotas da API
+	apiV1.Use(security.AuditMiddleware(auditLogger))
 	{
 		public := apiV1.Group("")
 		{
 			public.GET("/", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{"message": "Identity Service v1"})
 			})
-			// Rotas POST principais
-			public.POST("/register", handlers.RegisterUser)
-			public.POST("/login", handlers.LoginUser)
+			// Rotas POST principais com rate limiting específico
+			public.POST("/register", authLimiter.RateLimitMiddleware(), handlers.RegisterUser)
+			public.POST("/login", authLimiter.RateLimitMiddleware(), handlers.LoginUser)
 			public.POST("/logout", handlers.LogoutUser)
 			public.POST("/refresh", handlers.RefreshToken) // Rota de refresh é pública
 
@@ -165,10 +189,24 @@ func main() {
 			public.HEAD("/refresh", handlers.HeadHandler)
 		}
 
+		// Rota específica para verificação 2FA no login
+		public.POST("/2fa/verify", handlers.Login2FA)
+			
 		protected := apiV1.Group("")
 		protected.Use(handlers.AuthMiddleware()) // Aplicar middleware de autenticação a este grupo
+		protected.Use(handlers.TwoFactorMiddleware()) // Aplicar middleware de 2FA após autenticação
 		{
 			protected.GET("/me", handlers.GetUserProfile)
+		
+			// Rotas para o gerenciamento de 2FA com limitação de taxa para operações sensíveis
+			twoFactorGroup := protected.Group("/2fa")
+			{
+				// Aplicar sensitiveLimiter para operações sensíveis
+				twoFactorGroup.GET("/setup", sensitiveLimiter.RateLimitMiddleware(), handlers.GenerateSetup2FA)
+				twoFactorGroup.POST("/setup", sensitiveLimiter.RateLimitMiddleware(), handlers.Verify2FA)
+				twoFactorGroup.DELETE("/disable", sensitiveLimiter.RateLimitMiddleware(), handlers.Disable2FA)
+				twoFactorGroup.GET("/status", handlers.GetTwoFactorStatus)
+			}
 		}
 	}
 

@@ -73,3 +73,13 @@ func DisconnectDB() {
 		}
 	}
 }
+
+// GetDatabase returns the MongoDB database instance
+func GetDatabase() *mongo.Database {
+	if MongoDatabase == nil {
+		// Este erro não deveria ocorrer se InitDB for chamado na inicialização
+		log.Fatal("Database not initialized. Call InitDB first.")
+		return nil
+	}
+	return MongoDatabase
+}

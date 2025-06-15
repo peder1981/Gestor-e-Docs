@@ -42,7 +42,7 @@ func ConnectDatabase() error {
 	// Obter o nome do banco de dados da variável de ambiente ou usar valor padrão
 	dbName := os.Getenv("MONGO_DB_NAME")
 	if dbName == "" {
-		dbName = "gestor_docs"
+		dbName = "gestor_e_docs"
 		log.Println("Aviso: Usando nome padrão do banco de dados. Considere definir a variável de ambiente MONGO_DB_NAME.")
 	}
 

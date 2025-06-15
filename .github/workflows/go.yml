@@ -1,0 +1,53 @@
+name: Go CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: identity-service
+            path: backend/services/identity-service
+          - name: document-service
+            path: backend/services/document-service
+          - name: conversion-service
+            path: backend/services/conversion-service
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: Download dependencies
+        working-directory: ${{ matrix.path }}
+        run: go mod download
+
+      - name: Run go fmt
+        working-directory: ${{ matrix.path }}
+        run: go fmt ./...
+
+      - name: Run go vet
+        working-directory: ${{ matrix.path }}
+        run: go vet ./...
+
+      - name: Run unit tests
+        working-directory: ${{ matrix.path }}
+        run: go test -v ./...
+
+      - name: Lint code
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.57.0
+          working-directory: ${{ matrix.path }}

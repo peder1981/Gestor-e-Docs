@@ -12,19 +12,31 @@ Plataforma web para gerenciamento completo de documentos eletrônicos no formato
 [![Go](https://img.shields.io/badge/Go-1.20+-blue.svg)](https://golang.org/)
 [![React](https://img.shields.io/badge/React-18.2+-blue.svg)](https://reactjs.org/)
 
-### Resumo das Correções e Melhorias (Junho/2025)
-Este projeto passou por uma extensa fase de depuração e refatoração para estabilizar o ambiente e corrigir o fluxo de autenticação. As principais melhorias incluem:
+### Resumo das Melhorias (Junho/2025)
+Este projeto passou por uma extensa fase de aprimoramento e estabilização. As principais melhorias incluem:
 
-- **Criação de Usuário Admin Confiável**: A lógica de criação do usuário administrador foi integrada diretamente à inicialização do `identity-service`. Isso resolveu um problema crítico de persistência de dados no Docker, eliminando a necessidade de scripts externos (`create-admin-user.go`) e simplificando o Dockerfile.
+#### ✅ Correções Gerais (Q1 2025)
+- **Criação de Usuário Admin Confiável**: A lógica de criação do usuário administrador foi integrada diretamente à inicialização do `identity-service`, eliminando a necessidade de scripts externos.
 
-- **Correção do Fluxo de Autenticação**: O principal bug que impedia o login foi resolvido. O problema era multifacetado:
-  - **Backend**: O endpoint `/me` foi corrigido para retornar o objeto de usuário completo, em vez de apenas uma mensagem de sucesso, que era o que o frontend esperava.
-  - **Frontend**: O cliente de API (`axios`) foi configurado com `withCredentials: true` para garantir que os cookies de autenticação (HttpOnly) fossem enviados em todas as requisições.
-  - **Frontend**: A lógica no `AuthContext` foi refinada para lidar corretamente com a resposta da API, atualizando o estado de autenticação e permitindo o redirecionamento para a página principal após o login.
+- **Correção do Fluxo de Autenticação**: O principal bug que impedia o login foi resolvido, corrigindo o endpoint `/me` e configurando o cliente de API (`axios`) adequadamente.
 
-- **Estabilização do Build**: Foram resolvidos múltiplos erros de build no backend (conflitos de módulos Go, caminhos de importação incorretos) e no frontend (dependências ausentes, erros de lint, importações erradas).
+- **Estabilização do Build**: Foram resolvidos múltiplos erros de build no backend e no frontend.
 
-- **Segurança**: O modelo de usuário no backend foi ajustado para nunca expor o hash da senha em respostas JSON (`json:"-"`), e a configuração de cookies HttpOnly foi validada para proteger contra ataques XSS.
+- **Segurança Básica**: O modelo de usuário no backend foi ajustado para nunca expor o hash da senha em respostas JSON, e a configuração de cookies HttpOnly foi implementada.
+
+#### ✅ Serviço de Conversão (Q1 2025)
+- **Conversion Service**: Implementação completa do serviço de conversão de documentos Markdown para PDF, HTML, DOCX e LaTeX.
+- **Processamento Assíncrono**: Implementação de queue para processamento assíncrono de conversões.
+
+#### ✅ Melhorias de Segurança (Q2 2025)
+- **Rate Limiting**: Implementação de limitação de taxa para proteger contra ataques de força bruta (5 tentativas/min nas rotas de autenticação, 60 req/min global).
+- **Log de Auditoria**: Sistema completo de registro de ações dos usuários, armazenando detalhes como endereço IP, ação realizada, status da resposta e timestamp.
+- **Autenticação em Duas Etapas (2FA)**: Implementação de 2FA para maior segurança das contas de usuário.
+
+#### ✅ Consolidação de Banco de Dados (Q2 2025)
+- **Unificação do MongoDB**: Migração de todas as coleções para um único banco de dados `gestor_e_docs` (anteriormente dividido entre `gestor_e_docs` e `gestor_docs`).
+- **Correção de Bugs de Persistência**: Resolução de problemas com persistência de IDs e outros dados no MongoDB.
+- **Otimização da Comunicação entre Serviços**: Correção de problemas de comunicação entre serviços, especialmente na integração com Nginx.
 
 ### Tecnologias
 - **Backend**: GoLang (Arquitetura de Microserviços)
