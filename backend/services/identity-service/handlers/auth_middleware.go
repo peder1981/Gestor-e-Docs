@@ -13,12 +13,12 @@ import (
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log.Printf("[AuthMiddleware] Headers: %v", c.Request.Header)
-		
+
 		// Listar todos os cookies recebidos
 		cookies := c.Request.Cookies()
 		log.Printf("[AuthMiddleware] Recebidos %d cookies", len(cookies))
 		for i, cookie := range cookies {
-			log.Printf("[AuthMiddleware] Cookie[%d]: Nome=%s, Valor=%s, Domain=%s, Path=%s", 
+			log.Printf("[AuthMiddleware] Cookie[%d]: Nome=%s, Valor=%s, Domain=%s, Path=%s",
 				i, cookie.Name, cookie.Value, cookie.Domain, cookie.Path)
 		}
 

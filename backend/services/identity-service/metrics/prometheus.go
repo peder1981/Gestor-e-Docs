@@ -18,12 +18,12 @@ var (
 		},
 		[]string{"handler", "method", "status"},
 	)
-	
+
 	// HTTPDuration mede a duração das requisições HTTP
 	HTTPDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "identity_service_http_duration_seconds",
-			Help: "Duração das requisições HTTP em segundos.",
+			Name:    "identity_service_http_duration_seconds",
+			Help:    "Duração das requisições HTTP em segundos.",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"handler", "method"},
@@ -60,7 +60,7 @@ func Init() {
 // PrometheusHandler retorna um handler HTTP para o Prometheus
 func PrometheusHandler() gin.HandlerFunc {
 	h := promhttp.Handler()
-	
+
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
@@ -74,13 +74,13 @@ func PrometheusMiddleware() gin.HandlerFunc {
 		if path == "" {
 			path = "unknown"
 		}
-		
+
 		c.Next()
-		
+
 		// Após a execução da requisição
 		status := c.Writer.Status()
 		duration := time.Since(start).Seconds()
-		
+
 		// Registrar métricas
 		HTTPRequests.WithLabelValues(path, c.Request.Method, strconv.Itoa(status)).Inc()
 		HTTPDuration.WithLabelValues(path, c.Request.Method).Observe(duration)

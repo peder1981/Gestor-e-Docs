@@ -106,8 +106,6 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
-
-
 	collection := db.GetCollection("users")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -130,7 +128,6 @@ func LoginUser(c *gin.Context) {
 	log.Printf("[LoginUser] User %s found. Verifying password.", req.Email)
 
 	if err = bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(req.Password)); err != nil {
-
 
 		log.Printf("[LoginUser] Password verification failed for user %s: %v", req.Email, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
@@ -165,7 +162,7 @@ func LoginUser(c *gin.Context) {
 		Value:    accessToken,
 		MaxAge:   15 * 60, // 15 minutos
 		Path:     "/",
-		Domain:   "", // Vazio para usar o domínio atual
+		Domain:   "",   // Vazio para usar o domínio atual
 		Secure:   true, // Sempre true pois usamos HTTPS via Nginx
 		HttpOnly: true,
 		SameSite: sameSiteMode, // Usar a mesma configuração dinâmica do refresh_token
@@ -179,7 +176,7 @@ func LoginUser(c *gin.Context) {
 		Value:    refreshToken,
 		MaxAge:   7 * 24 * 60 * 60, // 7 dias
 		Path:     "/",
-		Domain:   "", // Vazio para usar o domínio atual
+		Domain:   "",   // Vazio para usar o domínio atual
 		Secure:   true, // Sempre true pois usamos HTTPS via Nginx
 		HttpOnly: true,
 		SameSite: sameSiteMode, // Usar o mesmo modo do access_token
@@ -263,7 +260,7 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	sameSiteMode := http.SameSiteLaxMode 
+	sameSiteMode := http.SameSiteLaxMode
 	if os.Getenv("COOKIE_SAMESITE_STRICT") == "true" {
 		sameSiteMode = http.SameSiteStrictMode
 	}
@@ -271,10 +268,10 @@ func RefreshToken(c *gin.Context) {
 	newAccessTokenCookie := http.Cookie{
 		Name:     "access_token",
 		Value:    newAccessToken,
-		MaxAge:   15 * 60, 
+		MaxAge:   15 * 60,
 		Path:     "/",
-		Domain:   "", 
-		Secure:   true, 
+		Domain:   "",
+		Secure:   true,
 		HttpOnly: true,
 		SameSite: sameSiteMode,
 	}

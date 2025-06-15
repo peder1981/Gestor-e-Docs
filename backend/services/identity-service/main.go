@@ -80,21 +80,21 @@ func main() {
 
 	// Inicializar métricas do Prometheus
 	metrics.Init()
-	
+
 	// Inicializar o serviço de autenticação de dois fatores
 	handlers.InitTwoFactorAuth()
-	
+
 	// Inicializar o log de auditoria
 	auditLogger := security.NewAuditLogger(db.GetCollection("audit_logs"), true, true)
-	
+
 	// Inicializar os rate limiters
 	// Usar limiters pré-configurados do pacote security
 	// Limitador global já está configurado para 60 requisições por minuto por IP
 	globalLimiter := security.GetGlobalLimiter()
-	
+
 	// Limitador para autenticação configurado para 5 tentativas por minuto por IP
 	authLimiter := security.GetAuthLimiter()
-	
+
 	// Limitador para operações sensíveis configurado para 10 operações por minuto por usuário
 	sensitiveLimiter := security.GetSensitiveLimiter()
 
@@ -116,7 +116,7 @@ func main() {
 
 	// Configuração do CORS baseada em variáveis de ambiente
 	config := cors.DefaultConfig()
-	
+
 	// Obter origens permitidas do ambiente ou usar padrões de desenvolvimento
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	if allowedOrigins == "" {
@@ -153,7 +153,7 @@ func main() {
 	config.MaxAge = 12 * time.Hour
 
 	r.Use(cors.New(config))
-	
+
 	// Adiciona o middleware de rate limiting global em todas as rotas
 	r.Use(globalLimiter.RateLimitMiddleware())
 
@@ -167,7 +167,7 @@ func main() {
 
 	// Rota de API V1 - placeholder
 	apiV1 := r.Group("/api/v1/identity")
-	
+
 	// Adicionar middleware de auditoria a todas as rotas da API
 	apiV1.Use(security.AuditMiddleware(auditLogger))
 	{
@@ -191,13 +191,13 @@ func main() {
 
 		// Rota específica para verificação 2FA no login
 		public.POST("/2fa/verify", handlers.Login2FA)
-			
+
 		protected := apiV1.Group("")
-		protected.Use(handlers.AuthMiddleware()) // Aplicar middleware de autenticação a este grupo
+		protected.Use(handlers.AuthMiddleware())      // Aplicar middleware de autenticação a este grupo
 		protected.Use(handlers.TwoFactorMiddleware()) // Aplicar middleware de 2FA após autenticação
 		{
 			protected.GET("/me", handlers.GetUserProfile)
-		
+
 			// Rotas para o gerenciamento de 2FA com limitação de taxa para operações sensíveis
 			twoFactorGroup := protected.Group("/2fa")
 			{

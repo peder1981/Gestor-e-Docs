@@ -31,10 +31,10 @@ type TwoFactorConfig struct {
 
 // TwoFactorVerification representa uma tentativa de verificação 2FA
 type TwoFactorVerification struct {
-	UserID      string    `bson:"user_id" json:"user_id"`
-	Token       string    `bson:"token" json:"token"`
-	Expiration  time.Time `bson:"expiration" json:"expiration"`
-	VerifiedAt  time.Time `bson:"verified_at,omitempty" json:"verified_at,omitempty"`
+	UserID     string    `bson:"user_id" json:"user_id"`
+	Token      string    `bson:"token" json:"token"`
+	Expiration time.Time `bson:"expiration" json:"expiration"`
+	VerifiedAt time.Time `bson:"verified_at,omitempty" json:"verified_at,omitempty"`
 }
 
 // TwoFactorAuth gerencia a autenticação de dois fatores
@@ -107,7 +107,7 @@ func (tfa *TwoFactorAuth) GenerateSecret(ctx context.Context, userID, username, 
 	filter := bson.M{"user_id": userID}
 	update := bson.M{"$set": config}
 	upsert := true
-	_, err = tfa.configCollection.UpdateOne(ctx, filter, update, 
+	_, err = tfa.configCollection.UpdateOne(ctx, filter, update,
 		options.Update().SetUpsert(upsert))
 	if err != nil {
 		return nil, "", nil, err
@@ -138,14 +138,14 @@ func (tfa *TwoFactorAuth) ValidateCode(ctx context.Context, userID, code string)
 		if backupCode == code {
 			// Remove o código de backup usado
 			config.BackupCodes = append(config.BackupCodes[:i], config.BackupCodes[i+1:]...)
-			
+
 			// Atualiza a configuração
 			update := bson.M{"$set": bson.M{"backup_codes": config.BackupCodes}}
 			_, err := tfa.configCollection.UpdateOne(ctx, bson.M{"user_id": userID}, update)
 			if err != nil {
 				log.Printf("[2FA] Erro ao atualizar códigos de backup: %v", err)
 			}
-			
+
 			return true, nil
 		}
 	}
@@ -208,8 +208,8 @@ func (tfa *TwoFactorAuth) VerifyToken(ctx context.Context, token string) (string
 	// Busca o token
 	var verification TwoFactorVerification
 	err := tfa.verifyCollection.FindOne(ctx, bson.M{
-		"token":      token,
-		"expiration": bson.M{"$gt": time.Now()},
+		"token":       token,
+		"expiration":  bson.M{"$gt": time.Now()},
 		"verified_at": bson.M{"$exists": false},
 	}).Decode(&verification)
 
@@ -223,8 +223,8 @@ func (tfa *TwoFactorAuth) VerifyToken(ctx context.Context, token string) (string
 	// Marca o token como verificado
 	update := bson.M{"$set": bson.M{"verified_at": time.Now()}}
 	_, err = tfa.verifyCollection.UpdateOne(
-		ctx, 
-		bson.M{"token": token}, 
+		ctx,
+		bson.M{"token": token},
 		update,
 	)
 	if err != nil {
@@ -244,7 +244,7 @@ func generateBackupCodes(count int) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Codifica para base32 e formata
 		encoded := strings.ToUpper(base32.StdEncoding.EncodeToString(b))
 		codes[i] = fmt.Sprintf("%s-%s", encoded[:5], encoded[5:10])
@@ -305,7 +305,7 @@ func TwoFactorRequiredMiddleware(tfa *TwoFactorAuth) gin.HandlerFunc {
 				// Não tem token, exige autenticação 2FA
 				c.JSON(http.StatusForbidden, gin.H{
 					"error": "2FA verification required",
-					"code": "2FA_REQUIRED",
+					"code":  "2FA_REQUIRED",
 				})
 				c.Abort()
 				return
@@ -316,7 +316,7 @@ func TwoFactorRequiredMiddleware(tfa *TwoFactorAuth) gin.HandlerFunc {
 			if err != nil || verifiedUserID != userID.(string) {
 				c.JSON(http.StatusForbidden, gin.H{
 					"error": "Invalid 2FA token",
-					"code": "INVALID_2FA_TOKEN",
+					"code":  "INVALID_2FA_TOKEN",
 				})
 				c.Abort()
 				return
@@ -348,5 +348,3 @@ func isExemptPath(path string) bool {
 
 	return false
 }
-
-

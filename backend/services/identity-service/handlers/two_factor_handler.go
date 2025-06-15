@@ -51,12 +51,12 @@ func GenerateSetup2FA(c *gin.Context) {
 
 	collection := db.GetCollection("users")
 	ctx := context.Background()
-	
+
 	var user struct {
 		Email string `bson:"email"`
 		Name  string `bson:"name"`
 	}
-	
+
 	err = collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user"})
@@ -65,7 +65,7 @@ func GenerateSetup2FA(c *gin.Context) {
 
 	// Gera o segredo 2FA
 	config, otpURL, qrCode, err := twoFactorAuth.GenerateSecret(
-		ctx, 
+		ctx,
 		userID.(string),
 		user.Email,
 		"Gestor-e-Docs",
@@ -81,11 +81,11 @@ func GenerateSetup2FA(c *gin.Context) {
 	qrCodeBase64 := "data:image/png;base64," + encodeToBase64(qrCode)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "2FA setup generated",
-		"secret": config.Secret,
-		"otpauth_url": otpURL,
-		"qr_code": qrCodeBase64,
+		"success":      true,
+		"message":      "2FA setup generated",
+		"secret":       config.Secret,
+		"otpauth_url":  otpURL,
+		"qr_code":      qrCodeBase64,
 		"backup_codes": config.BackupCodes,
 	})
 }
@@ -110,7 +110,7 @@ func Verify2FA(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error": "Invalid verification code: " + err.Error(),
+			"error":   "Invalid verification code: " + err.Error(),
 		})
 		return
 	}
@@ -141,7 +141,7 @@ func Disable2FA(c *gin.Context) {
 	if err != nil || !valid {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error": "Invalid verification code",
+			"error":   "Invalid verification code",
 		})
 		return
 	}
@@ -151,7 +151,7 @@ func Disable2FA(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error": "Failed to disable 2FA: " + err.Error(),
+			"error":   "Failed to disable 2FA: " + err.Error(),
 		})
 		return
 	}
@@ -204,7 +204,7 @@ func Login2FA(c *gin.Context) {
 	if err != nil || !valid {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
-			"error": "Invalid verification code",
+			"error":   "Invalid verification code",
 		})
 		return
 	}
@@ -214,7 +214,7 @@ func Login2FA(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"error": "Failed to create verification token",
+			"error":   "Failed to create verification token",
 		})
 		return
 	}
@@ -258,7 +258,7 @@ func TwoFactorMiddleware() gin.HandlerFunc {
 		// Verifica se o usuário tem 2FA habilitado
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		enabled, err := twoFactorAuth.IsTwoFactorEnabled(ctx, userID.(string))
 		if err != nil {
 			log.Printf("[2FA] Erro ao verificar status do 2FA: %v", err)
@@ -276,14 +276,14 @@ func TwoFactorMiddleware() gin.HandlerFunc {
 		cookie, err := c.Request.Cookie("2fa_token")
 		if err != nil || cookie.Value == "" {
 			log.Printf("[2FA] Token 2FA não encontrado para usuário %s", userID.(string))
-			
+
 			// Define o usuário com verificação 2FA pendente
 			c.Set("2fa_pending_user_id", userID)
-			
+
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"error": "Two-factor authentication required",
-				"code": "2FA_REQUIRED",
+				"error":   "Two-factor authentication required",
+				"code":    "2FA_REQUIRED",
 			})
 			return
 		}
@@ -292,14 +292,14 @@ func TwoFactorMiddleware() gin.HandlerFunc {
 		tokenUserID, err := twoFactorAuth.VerifyToken(ctx, cookie.Value)
 		if err != nil || tokenUserID != userID.(string) {
 			log.Printf("[2FA] Token 2FA inválido: %v", err)
-			
+
 			// Define o usuário com verificação 2FA pendente
 			c.Set("2fa_pending_user_id", userID)
-			
+
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"error": "Two-factor authentication required",
-				"code": "2FA_REQUIRED",
+				"error":   "Two-factor authentication required",
+				"code":    "2FA_REQUIRED",
 			})
 			return
 		}

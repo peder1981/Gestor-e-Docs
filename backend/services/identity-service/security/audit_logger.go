@@ -121,7 +121,7 @@ func AuditMiddleware(logger *AuditLogger) gin.HandlerFunc {
 
 // bodyReader é um helper para permitir a leitura do body mais de uma vez
 type bodyReader struct {
-	buf []byte
+	buf    []byte
 	Reader io.ReadCloser
 }
 
@@ -168,5 +168,3 @@ func (al *AuditLogger) GetAuditEvents(ctx context.Context, filter map[string]int
 
 	return events, nil
 }
-
-

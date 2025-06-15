@@ -56,7 +56,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 		// This should ideally not happen if InitDB is called at application startup
 		// and its error is handled.
 		log.Fatal("Database not initialized. Call InitDB first.")
-		return nil 
+		return nil
 	}
 	return MongoDatabase.Collection(collectionName)
 }
