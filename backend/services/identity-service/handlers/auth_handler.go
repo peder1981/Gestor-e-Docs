@@ -24,13 +24,27 @@ func HeadHandler(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
+// RegisterRequest define a estrutura esperada para o corpo da requisição de registro
+type RegisterRequest struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8"`
+}
+
 // RegisterUser registra um novo usuário no sistema
 func RegisterUser(c *gin.Context) {
-	var user models.User
+	var req RegisterRequest
 
-	if err := c.ShouldBindJSON(&user); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload: " + err.Error()})
 		return
+	}
+
+	// Criar o modelo User a partir do request
+	user := models.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
 	}
 
 	collection := db.GetCollection("users")

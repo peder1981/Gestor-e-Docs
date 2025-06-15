@@ -43,11 +43,13 @@ func main() {
 	// Configuração CORS
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{
+		"https://localhost",
 		"http://localhost:3085",
 		"http://localhost",
 		"http://localhost:80",
 		"http://127.0.0.1:3085",
 		"http://127.0.0.1",
+		"https://127.0.0.1",
 	}
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Accept"}

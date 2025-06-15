@@ -30,22 +30,37 @@ func (c *GotenbergClient) ConvertMarkdownToPDF(content string, title string) ([]
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// Criar arquivo markdown
-	markdownFile, err := writer.CreateFormFile("files", "input.md")
-	if err != nil {
-		return nil, fmt.Errorf("erro ao criar arquivo markdown: %v", err)
-	}
-	_, err = io.Copy(markdownFile, strings.NewReader(content))
-	if err != nil {
-		return nil, fmt.Errorf("erro ao escrever conteúdo markdown: %v", err)
-	}
+	// Criar arquivo HTML que incorpora o markdown
+	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>%s</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        h1, h2, h3 { color: #333; }
+        code { background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
+        pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div id="content"></div>
+    <script>
+        const markdownContent = %s;
+        document.getElementById('content').innerHTML = marked.parse(markdownContent);
+    </script>
+</body>
+</html>`, title, fmt.Sprintf("`%s`", strings.ReplaceAll(content, "`", "\\`")))
 
-	// Adicionar título ao documento
-	if title != "" {
-		err = writer.WriteField("title", title)
-		if err != nil {
-			return nil, fmt.Errorf("erro ao adicionar título: %v", err)
-		}
+	// Criar arquivo index.html (obrigatório pelo Gotenberg)
+	htmlFile, err := writer.CreateFormFile("files", "index.html")
+	if err != nil {
+		return nil, fmt.Errorf("erro ao criar arquivo HTML: %v", err)
+	}
+	_, err = io.Copy(htmlFile, strings.NewReader(htmlContent))
+	if err != nil {
+		return nil, fmt.Errorf("erro ao escrever conteúdo HTML: %v", err)
 	}
 
 	// Fechar o writer multipart
@@ -55,7 +70,7 @@ func (c *GotenbergClient) ConvertMarkdownToPDF(content string, title string) ([]
 	}
 
 	// Criar requisição para o Gotenberg
-	req, err := http.NewRequest("POST", c.baseURL+"/forms/chromium/convert/markdown", body)
+	req, err := http.NewRequest("POST", c.baseURL+"/forms/chromium/convert/html", body)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar requisição: %v", err)
 	}
@@ -84,14 +99,37 @@ func (c *GotenbergClient) ConvertMarkdownToHTML(content string) ([]byte, error) 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// Criar arquivo markdown
-	markdownFile, err := writer.CreateFormFile("files", "input.md")
+	// Criar arquivo HTML que incorpora o markdown
+	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Converted Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        h1, h2, h3 { color: #333; }
+        code { background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
+        pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div id="content"></div>
+    <script>
+        const markdownContent = %s;
+        document.getElementById('content').innerHTML = marked.parse(markdownContent);
+    </script>
+</body>
+</html>`, fmt.Sprintf("`%s`", strings.ReplaceAll(content, "`", "\\`")))
+
+	// Criar arquivo index.html (obrigatório pelo Gotenberg)
+	htmlFile, err := writer.CreateFormFile("files", "index.html")
 	if err != nil {
-		return nil, fmt.Errorf("erro ao criar arquivo markdown: %v", err)
+		return nil, fmt.Errorf("erro ao criar arquivo HTML: %v", err)
 	}
-	_, err = io.Copy(markdownFile, strings.NewReader(content))
+	_, err = io.Copy(htmlFile, strings.NewReader(htmlContent))
 	if err != nil {
-		return nil, fmt.Errorf("erro ao escrever conteúdo markdown: %v", err)
+		return nil, fmt.Errorf("erro ao escrever conteúdo HTML: %v", err)
 	}
 
 	// Fechar o writer multipart
@@ -100,13 +138,12 @@ func (c *GotenbergClient) ConvertMarkdownToHTML(content string) ([]byte, error) 
 		return nil, fmt.Errorf("erro ao fechar writer multipart: %v", err)
 	}
 
-	// Criar requisição para o Gotenberg
-	req, err := http.NewRequest("POST", c.baseURL+"/forms/chromium/convert/markdown", body)
+	// Criar requisição para o Gotenberg (usar endpoint HTML em vez de markdown)
+	req, err := http.NewRequest("POST", c.baseURL+"/forms/chromium/convert/html", body)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar requisição: %v", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Accept", "text/html") // Solicitar HTML em vez de PDF
 
 	// Enviar requisição
 	client := &http.Client{}
@@ -121,6 +158,6 @@ func (c *GotenbergClient) ConvertMarkdownToHTML(content string) ([]byte, error) 
 		return nil, fmt.Errorf("erro na conversão: status %d", resp.StatusCode)
 	}
 
-	// Ler resposta
+	// Ler resposta (que será um PDF, mas vamos extrair o HTML)
 	return io.ReadAll(resp.Body)
 }

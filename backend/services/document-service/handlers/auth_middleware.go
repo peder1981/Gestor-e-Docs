@@ -54,7 +54,10 @@ func ValidateToken(tokenString string) (*TokenClaims, error) {
 	// Remover o prefixo "Bearer " se existir
 	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	// Usar jwt.RegisteredClaims para compatibilidade com identity-service
+	claims := &jwt.RegisteredClaims{}
+	
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		// Verificar o método de assinatura
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("método de assinatura inesperado: %v", token.Header["alg"])
@@ -66,26 +69,23 @@ func ValidateToken(tokenString string) (*TokenClaims, error) {
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// Verificar se o token está expirado
-		if exp, ok := claims["exp"].(float64); ok {
-			if time.Now().Unix() > int64(exp) {
-				return nil, errors.New("token expirado")
-			}
-		}
-
-		// Extrair o ID do usuário
-		userID, ok := claims["user_id"].(string)
-		if !ok {
-			return nil, errors.New("user_id inválido no token")
-		}
-
-		return &TokenClaims{
-			UserID: userID,
-		}, nil
+	if !token.Valid {
+		return nil, errors.New("token inválido")
 	}
 
-	return nil, errors.New("token inválido")
+	// Verificar se o token está expirado (redundante, mas mantido para clareza)
+	if claims.ExpiresAt != nil && time.Now().After(claims.ExpiresAt.Time) {
+		return nil, errors.New("token expirado")
+	}
+
+	// Usar Subject (padrão JWT) ao invés de user_id customizado
+	if claims.Subject == "" {
+		return nil, errors.New("subject inválido no token")
+	}
+
+	return &TokenClaims{
+		UserID: claims.Subject,
+	}, nil
 }
 
 // getSecretKey obtém a chave secreta para tokens JWT da variável de ambiente

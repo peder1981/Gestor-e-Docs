@@ -34,8 +34,8 @@ services:
   # Serviço de Identidade (GoLang)
   identity-service:
     build:
-      context: .
-      dockerfile: ./backend/services/identity-service/Dockerfile
+      context: ./backend/services/identity-service
+      dockerfile: Dockerfile
     container_name: identity_service
     # Removendo portas expostas diretamente, agora expostas via nginx
     # volumes:

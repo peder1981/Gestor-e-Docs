@@ -1,17 +1,22 @@
 # Build stage
-FROM golang:1.20-alpine AS builder
+FROM golang:1.24.2 AS builder
 
 WORKDIR /app
 
-# Copiar arquivos necessários
+# Copiar os arquivos de módulo primeiro para aproveitar o cache do Docker
 COPY go.mod go.sum ./
-COPY vendor/ vendor/
-COPY main.go .
-COPY handlers/ handlers/
-COPY metrics/ metrics/
+
+# Baixar as dependências
+RUN go mod download
+
+# Copiar todo o código do serviço
+COPY . ./
+
+# Garantir que o go.sum está perfeitamente sincronizado com o código
+RUN go mod tidy
 
 # Compilar o serviço
-RUN CGO_ENABLED=0 GOOS=linux go build -o conversion-service
+RUN CGO_ENABLED=0 GOOS=linux go build -o conversion-service .
 
 # Final stage
 FROM alpine:latest

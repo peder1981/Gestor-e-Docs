@@ -1,37 +1,21 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24.2 AS builder
 
 WORKDIR /app
 
-# Instalar ferramentas necessárias
-RUN apk add --no-cache git gcc musl-dev ca-certificates
+# Copiar os arquivos de módulo primeiro para aproveitar o cache do Docker
+COPY go.mod go.sum ./
 
-# Configurar para ignorar verificações de integridade
-ENV GOSUMDB=off
-ENV GO111MODULE=on
-ENV GOPROXY=direct
+# Baixar as dependências
+RUN go mod download
 
-# Copiar todo o código-fonte (importante: copie antes de manipular dependências)
-COPY . .
+# Copiar todo o código do serviço
+COPY . ./
 
-# Gerar go.mod do zero (ignorando possíveis problemas existentes)
-RUN rm -f go.mod go.sum
-RUN go mod init gestor-e-docs/document-service
+# Garantir que o go.sum está perfeitamente sincronizado com o código
+RUN go mod tidy
 
-# Forçar adição das dependências necessárias com versões específicas
-RUN go get github.com/golang-jwt/jwt/v5@v5.0.0
-RUN go get github.com/gin-gonic/gin@v1.9.1
-RUN go get github.com/gin-contrib/cors@v1.4.0
-RUN go get github.com/minio/minio-go/v7@v7.0.61
-RUN go get go.mongodb.org/mongo-driver/mongo@v1.12.0
-RUN go get github.com/google/uuid@v1.3.0
-
-# Desativar a verificação de módulos completamente
-RUN go env -w GOFLAGS="-mod=mod"
-
-# Compilar com flags para ignorar erros menos graves
-RUN CGO_ENABLED=0 GOOS=linux go build -o document-service . || \
-    # Se falhar, tente um build mais agressivo ignorando mais erros
-    CGO_ENABLED=0 GOOS=linux go build -tags=nomsgpack -o document-service .
+# Compilar o binário principal do serviço
+RUN CGO_ENABLED=0 GOOS=linux go build -o document-service .
 
 # Imagem final
 FROM alpine:latest
