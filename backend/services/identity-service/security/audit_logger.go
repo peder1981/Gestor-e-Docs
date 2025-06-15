@@ -153,7 +153,7 @@ func (al *AuditLogger) GetAuditEvents(ctx context.Context, filter map[string]int
 	opts := options.Find().
 		SetLimit(int64(limit)).
 		SetSkip(int64(skip)).
-		SetSort(bson.D{{Key: "timestamp", Value: -1}}) // mais recentes primeiro
+		SetSort(bson.D{bson.E{Key: "timestamp", Value: -1}}) // mais recentes primeiro
 
 	cursor, err := al.collection.Find(ctx, filter, opts)
 	if err != nil {

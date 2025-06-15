@@ -107,38 +107,38 @@ func createIndices() {
 	defer cancel()
 
 	// Índices para a coleção de documentos
-	documentIndices := []mongo.IndexModel{
+ 	documentIndices := []mongo.IndexModel{
+ 		{
+ 			Keys: bson.D{bson.E{Key: "title", Value: "text"}, bson.E{Key: "content", Value: "text"}},
+ 			Options: options.Index().
+ 				SetName("text_search").
+ 				SetWeights(bson.D{
+ 					bson.E{Key: "title", Value: 10},
+ 					bson.E{Key: "content", Value: 5},
+ 				}),
+ 		},
 		{
-			Keys: bson.D{{Key: "title", Value: "text"}, {Key: "content", Value: "text"}},
-			Options: options.Index().
-				SetName("text_search").
-				SetWeights(bson.D{
-					{Key: "title", Value: 10},
-					{Key: "content", Value: 5},
-				}),
-		},
-		{
-			Keys:    bson.D{{Key: "author_id", Value: 1}},
+			Keys:    bson.D{bson.E{Key: "author_id", Value: 1}},
 			Options: options.Index().SetName("author_id_idx"),
 		},
 		{
-			Keys:    bson.D{{Key: "tags", Value: 1}},
+			Keys:    bson.D{bson.E{Key: "tags", Value: 1}},
 			Options: options.Index().SetName("tags_idx"),
 		},
 		{
-			Keys:    bson.D{{Key: "categories", Value: 1}},
+			Keys:    bson.D{bson.E{Key: "categories", Value: 1}},
 			Options: options.Index().SetName("categories_idx"),
 		},
 		{
-			Keys:    bson.D{{Key: "status", Value: 1}},
+			Keys:    bson.D{bson.E{Key: "status", Value: 1}},
 			Options: options.Index().SetName("status_idx"),
 		},
 		{
-			Keys:    bson.D{{Key: "created_at", Value: -1}},
+			Keys:    bson.D{bson.E{Key: "created_at", Value: -1}},
 			Options: options.Index().SetName("created_at_idx"),
 		},
 		{
-			Keys:    bson.D{{Key: "updated_at", Value: -1}},
+			Keys:    bson.D{bson.E{Key: "updated_at", Value: -1}},
 			Options: options.Index().SetName("updated_at_idx"),
 		},
 	}
@@ -313,10 +313,10 @@ func (c *DocCollection) SearchDocuments(query *models.DocumentSearchQuery) ([]mo
 		if query.SortOrder == "desc" {
 			sortOrder = -1
 		}
-		opts.SetSort(bson.D{{Key: query.SortBy, Value: sortOrder}})
+		opts.SetSort(bson.D{bson.E{Key: query.SortBy, Value: sortOrder}})
 	} else {
 		// Ordenação padrão por data de atualização decrescente
-		opts.SetSort(bson.D{{Key: "updated_at", Value: -1}})
+		opts.SetSort(bson.D{bson.E{Key: "updated_at", Value: -1}})
 	}
 
 	// Configurar paginação
