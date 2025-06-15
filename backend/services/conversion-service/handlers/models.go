@@ -12,3 +12,12 @@ type ConversionResponse struct {
 	Message string `json:"message,omitempty"`
 	Data    []byte `json:"data,omitempty"`
 }
+
+// SupportedFormat representa um formato de conversão suportado
+type SupportedFormat struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	InputType   string `json:"input_type"`
+	OutputType  string `json:"output_type"`
+}

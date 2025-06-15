@@ -16,8 +16,16 @@ import (
 )
 
 func main() {
+	// Configurar logs
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Println("Iniciando Conversion Service...")
+
 	// Inicializar métricas do Prometheus
 	metrics.Init()
+
+	// Inicializar queue de conversão com 3 workers
+	handlers.InitializeQueue(3)
+	log.Println("Queue de conversão inicializada com 3 workers")
 
 	// Configurar o router
 	r := gin.Default()
@@ -62,12 +70,35 @@ func main() {
 	// Rotas públicas
 	api.GET("/formats", handlers.ListSupportedFormats)
 
-	// Rotas protegidas
+	// Rotas protegidas (síncronas)
 	protected := api.Group("/")
 	protected.Use(handlers.AuthMiddleware())
+	protected.Use(handlers.ConversionValidationMiddleware())
 	{
 		protected.POST("/markdown-to-pdf", handlers.ConvertMarkdownToPDF)
 		protected.POST("/markdown-to-html", handlers.ConvertMarkdownToHTML)
+		protected.POST("/markdown-to-docx", handlers.ConvertMarkdownToDOCX)
+		protected.POST("/markdown-to-latex", handlers.ConvertMarkdownToLaTeX)
+	}
+
+	// Rotas protegidas (assíncronas)
+	async := api.Group("/async")
+	async.Use(handlers.AuthMiddleware())
+	async.Use(handlers.ConversionValidationMiddleware())
+	{
+		async.POST("/markdown-to-pdf", handlers.AsyncConvertMarkdownToPDF)
+		async.POST("/markdown-to-html", handlers.AsyncConvertMarkdownToHTML)
+		async.POST("/markdown-to-docx", handlers.AsyncConvertMarkdownToDOCX)
+		async.POST("/markdown-to-latex", handlers.AsyncConvertMarkdownToLaTeX)
+	}
+
+	// Rotas para gerenciamento de jobs (protegidas, sem validação de conteúdo)
+	jobs := api.Group("/jobs")
+	jobs.Use(handlers.AuthMiddleware())
+	{
+		jobs.GET("/:jobId/status", handlers.GetJobStatus)
+		jobs.GET("/:jobId/download", handlers.DownloadJobResult)
+		jobs.GET("/stats", handlers.GetQueueStats)
 	}
 
 	// Determinar a porta do servidor
@@ -91,22 +122,19 @@ func main() {
 		}
 	}()
 
-	// Configurar canal para capturar sinais de encerramento
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	
-	// Bloquear até receber um sinal
 	<-quit
-	log.Println("Desligando o servidor...")
+	log.Println("Servidor finalizando...")
 
-	// Contexto com timeout para shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Finalizar queue
+	handlers.GetQueue().Shutdown()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
-	// Tentar shutdown graceful
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Erro durante o shutdown do servidor: %v", err)
+		log.Fatal("Erro ao finalizar servidor:", err)
 	}
-
-	log.Println("Servidor encerrado com sucesso")
+	log.Println("Servidor finalizado")
 }

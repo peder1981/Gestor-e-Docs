@@ -44,9 +44,9 @@ Este documento apresenta o roadmap de desenvolvimento da plataforma **Gestor-e-D
 ## 🚧 **EM DESENVOLVIMENTO - v1.1 (Q3 2025)**
 
 ### **Conversion Service**
-- 🔄 **conversion-service** - Microserviço para conversão de documentos
+- ✅ **conversion-service** - Microserviço para conversão de documentos
   - **Prioridade**: Alta
-  - **Status**: Planejado
+  - **Status**: CONCLUÍDO
   - **Funcionalidades**:
     - Markdown → PDF
     - Markdown → HTML

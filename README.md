@@ -43,19 +43,65 @@ O sistema é composto por serviços independentes que se comunicam via API REST:
 
 - **identity-service**: Responsável pela autenticação e autorização de usuários
 - **document-service**: Gerenciamento de documentos, incluindo upload, armazenamento, categorização e controle de versões
-- **conversion-service** (planejado): Conversão entre formatos de documento
+- **conversion-service**: Conversão de documentos Markdown para PDF, HTML, DOCX e LaTeX com processamento síncrono e assíncrono
 - **frontend-app**: Interface web para usuários
 - **nginx**: Proxy reverso para TLS/SSL e acesso seguro a todos os serviços
 - **prometheus + grafana**: Coleta, armazenamento e visualização de métricas
 - **fluentd + elasticsearch + kibana**: Coleta, armazenamento e visualização de logs
 
-### Sistema de Autenticação
-O Gestor-e-Docs utiliza um sistema moderno e seguro de autenticação:
+### Conversion Service
+O **Conversion Service** oferece conversão robusta de documentos Markdown para múltiplos formatos:
 
-- **Autenticação baseada em JWT** utilizando cookies HttpOnly
-- **Proteção contra XSS** por não expor tokens ao JavaScript no navegador
-- **Refresh tokens** para renovação automática de sessões
-- **CORS** configurado para proteger contra acessos não autorizados
+#### Formatos Suportados
+- **PDF**: Conversão via Gotenberg usando Chrome headless
+- **HTML**: Geração de HTML responsivo e acessível
+- **DOCX**: Conversão via LibreOffice através do Gotenberg
+- **LaTeX**: Conversor nativo implementado em Go
+
+#### Modos de Operação
+
+**Conversão Síncrona** (resposta imediata):
+- `POST /api/v1/convert/markdown-to-pdf`
+- `POST /api/v1/convert/markdown-to-html`
+- `POST /api/v1/convert/markdown-to-docx`
+- `POST /api/v1/convert/markdown-to-latex`
+
+**Conversão Assíncrona** (processamento em background):
+- `POST /api/v1/convert/async/markdown-to-pdf`
+- `POST /api/v1/convert/async/markdown-to-html`
+- `POST /api/v1/convert/async/markdown-to-docx`
+- `POST /api/v1/convert/async/markdown-to-latex`
+
+#### Gerenciamento de Jobs Assíncronos
+- `GET /api/v1/convert/jobs/{jobId}/status` - Verificar status do job
+- `GET /api/v1/convert/jobs/{jobId}/download` - Download do resultado
+- `GET /api/v1/convert/jobs/stats` - Estatísticas da queue de processamento
+
+#### Funcionalidades Avançadas
+- **Sistema de Queue**: Processamento assíncrono com workers concorrentes
+- **Validação Robusta**: Middleware que valida formato, tamanho e estrutura do Markdown
+- **Monitoramento**: Métricas Prometheus integradas
+- **Rate Limiting**: Proteção contra sobrecarga do sistema
+- **Cleanup Automático**: Remoção de jobs antigos após 24 horas
+
+#### Exemplo de Uso
+```bash
+# Conversão síncrona para PDF
+curl -X POST https://localhost/api/v1/convert/markdown-to-pdf \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"content": "# Meu Documento\n\nConteúdo em **Markdown**", "title": "exemplo"}'
+
+# Conversão assíncrona
+curl -X POST https://localhost/api/v1/convert/async/markdown-to-pdf \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"content": "# Documento Grande\n\nConteúdo extenso...", "title": "documento-grande"}'
+
+# Verificar status do job assíncrono
+curl -X GET https://localhost/api/v1/convert/jobs/{jobId}/status \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
 
 ### Configuração do Ambiente
 
