@@ -11,6 +11,7 @@ Plataforma web para gerenciamento completo de documentos eletrônicos no formato
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
 [![Go](https://img.shields.io/badge/Go-1.20+-blue.svg)](https://golang.org/)
 [![React](https://img.shields.io/badge/React-18.2+-blue.svg)](https://reactjs.org/)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/peder1981?style=social)](https://github.com/sponsors/peder1981)
 
 ### Resumo das Melhorias (Junho/2025)
 Este projeto passou por uma extensa fase de aprimoramento e estabilização. As principais melhorias incluem:
@@ -245,6 +246,7 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 <a name="english"></a>
 ## English
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/peder1981?style=social)](https://github.com/sponsors/peder1981)
 
 ### Overview
 Web platform for complete management of electronic documents in Markdown format, with features for uploading, secure storage, querying, conversion, and access control.

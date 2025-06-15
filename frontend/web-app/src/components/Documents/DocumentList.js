@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Documents.css';
+import documentApiClient from '../../api/documentApiClient';
 
 const DocumentList = () => {
   const [documents, setDocuments] = useState([]);
@@ -11,6 +12,22 @@ const DocumentList = () => {
     status: '',
     category: '',
   });
+  
+  // Estados para modais de ação
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState(null);
+  const [editData, setEditData] = useState({
+    title: '',
+    tags: [],
+    categories: [],
+    status: ''
+  });
+  const [newTag, setNewTag] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -74,6 +91,197 @@ const DocumentList = () => {
 
   const handleCreateDocument = () => {
     navigate('/documents/new');
+  };
+  
+  // Função para baixar um documento
+  const handleDownload = async (e, docId) => {
+    e.stopPropagation();
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      
+      // Chamada para API de download
+      const response = await documentApiClient.get(`/${docId}/download`, {
+        responseType: 'blob'
+      });
+      
+      // Criação do URL para o blob e download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Obter nome do arquivo a partir dos headers ou usar um padrão
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'documento.pdf';
+      if (contentDisposition) {
+        const filenameRegex = /filename[^;=\n]*=((['"]).*)\2|[^;\n]*/;
+        const matches = filenameRegex.exec(contentDisposition);
+        if (matches != null && matches[1]) {
+          filename = matches[1].replace(/['"]*/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      
+      // Limpeza após download
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      setActionSuccess('Download iniciado com sucesso!');
+      setTimeout(() => setActionSuccess(''), 3000);
+    } catch (err) {
+      console.error('Erro ao baixar documento:', err);
+      setActionError(err.response?.data?.message || 'Erro ao baixar o documento');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  // Função para abrir o modal de edição de metadados
+  const handleOpenEditModal = (e, doc) => {
+    e.stopPropagation();
+    setCurrentDocument(doc);
+    setEditData({
+      title: doc.title,
+      tags: doc.tags || [],
+      categories: doc.categories || [],
+      status: doc.status || 'draft'
+    });
+    setShowEditModal(true);
+  };
+  
+  // Função para adicionar tag no modal de edição
+  const handleAddTag = () => {
+    if (newTag.trim() && !editData.tags.includes(newTag)) {
+      setEditData(prev => ({
+        ...prev,
+        tags: [...prev.tags, newTag]
+      }));
+      setNewTag('');
+    }
+  };
+  
+  // Função para remover tag no modal de edição
+  const handleRemoveTag = (tagToRemove) => {
+    setEditData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  };
+  
+  // Função para adicionar categoria no modal de edição
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !editData.categories.includes(newCategory)) {
+      setEditData(prev => ({
+        ...prev,
+        categories: [...prev.categories, newCategory]
+      }));
+      setNewCategory('');
+    }
+  };
+  
+  // Função para remover categoria no modal de edição
+  const handleRemoveCategory = (categoryToRemove) => {
+    setEditData(prev => ({
+      ...prev,
+      categories: prev.categories.filter(category => category !== categoryToRemove)
+    }));
+  };
+  
+  // Função para lidar com alterações em campos do modal de edição
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Função para salvar metadados editados
+  const handleSaveMetadata = async (e) => {
+    e.preventDefault();
+    if (!currentDocument) return;
+    
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      
+      // Criar objeto com dados atualizados
+      const updatedData = {
+        title: editData.title.trim(),
+        tags: editData.tags,
+        categories: editData.categories,
+        status: editData.status,
+        // Preservar conteúdo e outros dados não editáveis
+        content: currentDocument.content || ''
+      };
+      
+      // Validar título
+      if (!updatedData.title) {
+        setActionError('O título é obrigatório');
+        setActionLoading(false);
+        return;
+      }
+      
+      // Chamada para API de atualização
+      await documentApiClient.put(`/${currentDocument.id}`, updatedData);
+      
+      // Fechar modal e atualizar lista
+      setShowEditModal(false);
+      setActionSuccess('Documento atualizado com sucesso!');
+      setTimeout(() => setActionSuccess(''), 3000);
+      
+      // Atualizar lista de documentos
+      fetchDocuments();
+    } catch (err) {
+      console.error('Erro ao atualizar documento:', err);
+      setActionError(err.response?.data?.message || 'Erro ao atualizar o documento');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  // Função para abrir modal de confirmação de exclusão
+  const handleOpenDeleteModal = (e, doc) => {
+    e.stopPropagation();
+    setCurrentDocument(doc);
+    setShowDeleteModal(true);
+  };
+  
+  // Função para confirmar exclusão
+  const handleConfirmDelete = async () => {
+    if (!currentDocument) return;
+    
+    try {
+      setActionLoading(true);
+      setActionError(null);
+      
+      // Chamada para API de exclusão
+      await documentApiClient.delete(`/${currentDocument.id}`);
+      
+      // Fechar modal e atualizar lista
+      setShowDeleteModal(false);
+      setActionSuccess('Documento excluído com sucesso!');
+      setTimeout(() => setActionSuccess(''), 3000);
+      
+      // Atualizar lista de documentos
+      fetchDocuments();
+    } catch (err) {
+      console.error('Erro ao excluir documento:', err);
+      setActionError(err.response?.data?.message || 'Erro ao excluir o documento');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  // Função para fechar modais
+  const handleCloseModals = () => {
+    setShowEditModal(false);
+    setShowDeleteModal(false);
+    setCurrentDocument(null);
+    setActionError(null);
   };
 
   const formatDate = (dateString) => {
@@ -205,12 +413,224 @@ const DocumentList = () => {
                       >
                         Visualizar
                       </button>
+                      <button
+                        onClick={(e) => handleDownload(e, doc.id)}
+                        className="download-btn"
+                        disabled={actionLoading}
+                      >
+                        Baixar
+                      </button>
+                      <button
+                        onClick={(e) => handleOpenEditModal(e, doc)}
+                        className="edit-btn"
+                        disabled={actionLoading}
+                      >
+                        Editar Metadados
+                      </button>
+                      <button
+                        onClick={(e) => handleOpenDeleteModal(e, doc)}
+                        className="delete-btn"
+                        disabled={actionLoading}
+                      >
+                        Excluir
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      
+      {/* Modal de feedback para ações */}
+      {actionSuccess && (
+        <div className="success-message">
+          {actionSuccess}
+        </div>
+      )}
+      
+      {actionError && (
+        <div className="error-message">
+          {actionError}
+        </div>
+      )}
+      
+      {/* Modal de edição de metadados */}
+      {showEditModal && currentDocument && (
+        <div className="modal-overlay">
+          <div className="modal-content edit-modal">
+            <div className="modal-header">
+              <h2>Editar Metadados</h2>
+              <button className="close-btn" onClick={handleCloseModals}>×</button>
+            </div>
+            
+            <form onSubmit={handleSaveMetadata} className="document-form">
+              {actionError && <div className="error-message">{actionError}</div>}
+              
+              <div className="form-group">
+                <label htmlFor="title">Título</label>
+                <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={editData.title}
+                  onChange={handleEditInputChange}
+                  placeholder="Título do documento"
+                  required
+                  className="form-control"
+                />
+              </div>
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="status">Status</label>
+                  <select
+                    id="status"
+                    name="status"
+                    value={editData.status}
+                    onChange={handleEditInputChange}
+                    className="form-control"
+                  >
+                    <option value="draft">Rascunho</option>
+                    <option value="review">Em Revisão</option>
+                    <option value="published">Publicado</option>
+                    <option value="archived">Arquivado</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="form-row">
+                <div className="form-group tags-section">
+                  <label>Tags</label>
+                  <div className="tags-input-container">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                      placeholder="Adicionar tag"
+                      className="tag-input"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleAddTag}
+                      className="add-tag-btn"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="tags-list">
+                    {editData.tags.map((tag, index) => (
+                      <span key={index} className="tag">
+                        {tag}
+                        <button 
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          className="remove-tag-btn"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group categories-section">
+                  <label>Categorias</label>
+                  <div className="categories-input-container">
+                    <input
+                      type="text"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())}
+                      placeholder="Adicionar categoria"
+                      className="category-input"
+                    />
+                    <button 
+                      type="button" 
+                      onClick={handleAddCategory}
+                      className="add-category-btn"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="categories-list">
+                    {editData.categories.map((category, index) => (
+                      <span key={index} className="category">
+                        {category}
+                        <button 
+                          type="button"
+                          onClick={() => handleRemoveCategory(category)}
+                          className="remove-category-btn"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="modal-actions">
+                <button 
+                  type="button" 
+                  className="cancel-btn" 
+                  onClick={handleCloseModals}
+                  disabled={actionLoading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="save-btn" 
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de confirmação de exclusão */}
+      {showDeleteModal && currentDocument && (
+        <div className="modal-overlay">
+          <div className="modal-content delete-modal">
+            <div className="modal-header">
+              <h2>Confirmar Exclusão</h2>
+              <button className="close-btn" onClick={handleCloseModals}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <p className="warning-text">
+                Tem certeza que deseja excluir o documento <strong>"{currentDocument.title}"</strong>?
+              </p>
+              <p className="warning-text">Esta ação não pode ser desfeita.</p>
+              
+              {actionError && <div className="error-message">{actionError}</div>}
+            </div>
+            
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                className="cancel-btn" 
+                onClick={handleCloseModals}
+                disabled={actionLoading}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                className="delete-confirm-btn" 
+                onClick={handleConfirmDelete}
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Excluindo...' : 'Sim, Excluir'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
