@@ -386,8 +386,6 @@ func DownloadDocument(c *gin.Context) {
 		return
 	}
 
-	// Buscar versão específica (opcional)
-	versionStr := c.Query("version")
 	objectPath := doc.StoragePath
 
 
