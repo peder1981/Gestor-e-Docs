@@ -85,6 +85,7 @@ func main() {
 		protected.DELETE("/:id", handlers.DeleteDocument)
 		protected.GET("/list", handlers.ListDocuments)
 		protected.GET("/:id/download", handlers.DownloadDocument)
+		protected.GET("/:id/download/file", handlers.DownloadDocumentFile)
 	}
 
 	// Determinar a porta do servidor

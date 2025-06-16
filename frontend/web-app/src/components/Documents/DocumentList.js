@@ -252,14 +252,21 @@ const DocumentList = () => {
   
   // Função para confirmar exclusão
   const handleConfirmDelete = async () => {
-    if (!currentDocument) return;
+    if (!currentDocument) {
+      console.log('Não há documento selecionado para exclusão');
+      return;
+    }
+    
+    console.log('Iniciando exclusão do documento:', currentDocument.id, currentDocument.title);
     
     try {
       setActionLoading(true);
       setActionError(null);
       
       // Chamada para API de exclusão
-      await documentApiClient.delete(`/${currentDocument.id}`);
+      console.log('Enviando requisição DELETE para:', `/api/v1/documents/${currentDocument.id}`);
+      const response = await documentApiClient.delete(`/${currentDocument.id}`);
+      console.log('Resposta da API de exclusão:', response);
       
       // Fechar modal e atualizar lista
       setShowDeleteModal(false);
@@ -270,9 +277,26 @@ const DocumentList = () => {
       fetchDocuments();
     } catch (err) {
       console.error('Erro ao excluir documento:', err);
-      setActionError(err.response?.data?.message || 'Erro ao excluir o documento');
+      const errorDetails = {
+        message: err.message,
+        responseData: err.response?.data,
+        responseStatus: err.response?.status,
+        statusText: err.response?.statusText,
+        stack: err.stack
+      };
+      console.error('Detalhes completos do erro de exclusão:', errorDetails);
+      
+      // Mostrar informações mais detalhadas do erro
+      const errorMessage = err.response?.data?.message || 
+                         err.response?.data?.error ||
+                         (typeof err.response?.data === 'string' ? err.response.data : null) ||
+                         err.message ||
+                         'Erro ao excluir o documento';
+                         
+      setActionError(`Erro na exclusão: ${errorMessage}`);
     } finally {
       setActionLoading(false);
+      console.log('Processo de exclusão finalizado');
     }
   };
   

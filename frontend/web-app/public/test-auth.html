@@ -42,10 +42,18 @@
     </div>
     
     <div>
-        <h2>Ações</h2>
+        <h2>Ações de Autenticação</h2>
         <button onclick="getMeInfo()">GET /me</button>
         <button onclick="refreshToken()">POST /refresh</button>
         <button onclick="logout()">Logout</button>
+    </div>
+    
+    <div>
+        <h2>Ações de Documentos</h2>
+        <button onclick="testDownload()">Testar Download</button>
+        <button onclick="testEditMetadata()">Testar Editar Metadados</button>
+        <button onclick="testDelete()">Testar Exclusão</button>
+        <button onclick="runAllDocumentTests()">Testar Todas as Ações</button>
     </div>
     
     <h2>Resultado:</h2>
@@ -55,8 +63,9 @@
     <pre id="cookies">Use as ações acima para verificar os cookies</pre>
 
     <script>
-        // URL base da API (usando caminho relativo porque estamos no mesmo domínio)
-        const apiBaseUrl = '/api/v1/identity';
+        // URLs base da API (usando caminho relativo porque estamos no mesmo domínio)
+        const identityApiUrl = '/api/v1/identity';
+        const documentsApiUrl = '/api/v1/documents';
         
         // Função para exibir resposta
         function showResponse(data, isError = false) {
@@ -94,7 +103,7 @@
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
                 
-                const response = await fetch(`${apiBaseUrl}/login`, {
+                const response = await fetch(`${identityApiUrl}/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -124,7 +133,7 @@
         // Obter informações do usuário (/me)
         async function getMeInfo() {
             try {
-                const response = await fetch(`${apiBaseUrl}/me`, {
+                const response = await fetch(`${identityApiUrl}/me`, {
                     method: 'GET',
                     credentials: 'include'  // Importante: permite enviar/receber cookies
                 });
@@ -150,7 +159,7 @@
         // Refresh Token
         async function refreshToken() {
             try {
-                const response = await fetch(`${apiBaseUrl}/refresh`, {
+                const response = await fetch(`${identityApiUrl}/refresh`, {
                     method: 'POST',
                     credentials: 'include'  // Importante: permite enviar/receber cookies
                 });
@@ -176,7 +185,7 @@
         // Logout
         async function logout() {
             try {
-                const response = await fetch(`${apiBaseUrl}/logout`, {
+                const response = await fetch(`${identityApiUrl}/logout`, {
                     method: 'POST',
                     credentials: 'include'  // Importante: permite enviar/receber cookies
                 });
@@ -199,8 +208,202 @@
             }
         }
 
-        // Mostrar cookies iniciais
+        // Mostrar cookies no carregamento da página
         showCookies();
+        
+        // ===== FUNÇÕES DE TESTE DE AÇÕES DE DOCUMENTOS =====
+        
+        // Função auxiliar para obter o primeiro documento disponível
+        async function getFirstDocument() {
+            const response = await fetch(`${documentsApiUrl}/list`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Falha ao obter documentos: ${response.status} ${response.statusText}\n${errorText}`);
+            }
+            
+            const data = await response.json();
+            const docs = data.documents || data;
+            
+            if (!Array.isArray(docs) || docs.length === 0) {
+                throw new Error('Nenhum documento disponível para testar');
+            }
+            
+            return docs[0];
+        }
+        
+        // Testar Download de Documento
+        async function testDownload() {
+            try {
+                showResponse({message: 'Iniciando teste de download...'});
+                
+                // Obter primeiro documento
+                const doc = await getFirstDocument();
+                showResponse({message: `Documento encontrado: ${doc.title || 'Sem título'} (ID: ${doc.id})`});
+                
+                // Tentar fazer o download
+                const downloadResponse = await fetch(`${documentsApiUrl}/${doc.id}/download`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                const downloadHeaders = Object.fromEntries([...downloadResponse.headers.entries()]);
+                
+                if (downloadResponse.ok) {
+                    // Download bem-sucedido
+                    showResponse({
+                        message: 'Download bem-sucedido!',
+                        status: downloadResponse.status,
+                        statusText: downloadResponse.statusText,
+                        headers: downloadHeaders,
+                        contentType: downloadHeaders['content-type'],
+                        contentDisposition: downloadHeaders['content-disposition'] || 'Não disponível'
+                    });
+                } else {
+                    // Erro no download
+                    const errorText = await downloadResponse.text();
+                    throw new Error(`Erro no download: ${downloadResponse.status} ${downloadResponse.statusText}\n${errorText}`);
+                }
+            } catch (error) {
+                showResponse({error: error.message}, true);
+            }
+        }
+        
+        // Testar Edição de Metadados
+        async function testEditMetadata() {
+            try {
+                showResponse({message: 'Iniciando teste de edição de metadados...'});
+                
+                // Obter primeiro documento
+                const doc = await getFirstDocument();
+                showResponse({message: `Documento para editar: ${doc.title || 'Sem título'} (ID: ${doc.id})`});
+                
+                // Preparar dados para atualização
+                const updateData = {
+                    title: `${doc.title || 'Documento'} (Teste de Edição)`,
+                    tags: ['teste'],
+                    categories: ['teste'],
+                    status: 'active'
+                };
+                
+                // Enviar requisição de atualização
+                const updateResponse = await fetch(`${documentsApiUrl}/${doc.id}`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (updateResponse.ok) {
+                    // Atualização bem-sucedida
+                    const result = await updateResponse.json();
+                    showResponse({
+                        message: 'Edição bem-sucedida!',
+                        status: updateResponse.status,
+                        statusText: updateResponse.statusText,
+                        data: result
+                    });
+                } else {
+                    // Erro na atualização
+                    const errorText = await updateResponse.text();
+                    throw new Error(`Erro na edição: ${updateResponse.status} ${updateResponse.statusText}\n${errorText}`);
+                }
+            } catch (error) {
+                showResponse({error: error.message}, true);
+            }
+        }
+        
+        // Testar Exclusão de Documento
+        async function testDelete() {
+            try {
+                showResponse({message: 'Iniciando teste de exclusão...'});
+                
+                // Obter documentos
+                showResponse({message: 'Tentando obter lista de documentos para exclusão...'});
+                const response = await fetch(`${documentsApiUrl}/list`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                showResponse({message: `Resposta da API de listagem: Status ${response.status} ${response.statusText}`});
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Falha ao obter documentos: ${response.status} ${response.statusText}\n${errorText}`);
+                }
+                
+                const data = await response.json();
+                showResponse({message: 'Resposta da API de listagem (detalhes):', data: data});
+                
+                const docs = data.documents || data;
+                showResponse({message: `Documentos encontrados: ${docs ? docs.length : 0}`});
+                
+                if (!Array.isArray(docs) || docs.length === 0) {
+                    throw new Error('Nenhum documento disponível para excluir');
+                }
+                
+                // Selecionar o último documento para exclusão (para não excluir sempre o primeiro)
+                const docToDelete = docs[docs.length - 1];
+                showResponse({message: `Documento para excluir: ${docToDelete.title || 'Sem título'} (ID: ${docToDelete.id})`});
+                
+                // Enviar requisição de exclusão
+                showResponse({message: `Enviando requisição para excluir documento ${docToDelete.id}...`});
+                const deleteResponse = await fetch(`${documentsApiUrl}/${docToDelete.id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                
+                if (deleteResponse.ok) {
+                    // Exclusão bem-sucedida
+                    showResponse({
+                        message: 'Exclusão bem-sucedida!',
+                        status: deleteResponse.status,
+                        statusText: deleteResponse.statusText
+                    });
+                } else {
+                    // Erro na exclusão
+                    const errorText = await deleteResponse.text();
+                    throw new Error(`Erro na exclusão: ${deleteResponse.status} ${deleteResponse.statusText}\n${errorText}`);
+                }
+            } catch (error) {
+                showResponse({error: error.message}, true);
+            }
+        }
+        
+        // Executar todos os testes de documentos em sequência
+        async function runAllDocumentTests() {
+            try {
+                showResponse({message: 'Iniciando todos os testes de ações de documentos...'});
+                
+                // Testar download
+                showResponse({message: '\n\n=== TESTE DE DOWNLOAD ==='});
+                await testDownload().catch(error => {
+                    showResponse({error: `Erro no teste de download: ${error.message}`}, true);
+                });
+                
+                // Testar edição
+                showResponse({message: '\n\n=== TESTE DE EDIÇÃO DE METADADOS ==='});
+                await testEditMetadata().catch(error => {
+                    showResponse({error: `Erro no teste de edição: ${error.message}`}, true);
+                });
+                
+                // Testar exclusão (por último para não afetar os outros testes)
+                showResponse({message: '\n\n=== TESTE DE EXCLUSÃO ==='});
+                await testDelete().catch(error => {
+                    showResponse({error: `Erro no teste de exclusão: ${error.message}`}, true);
+                });
+                
+                showResponse({message: '\n\nTodos os testes concluídos.'});
+            } catch (error) {
+                showResponse({error: error.message}, true);
+            }
+        }
     </script>
 </body>
 </html>

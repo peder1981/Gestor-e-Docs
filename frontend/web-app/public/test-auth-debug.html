@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Depuração</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Página de Teste Simplificada</h1>
+    
+    <h2>Seção de Autenticação</h2>
+    <button onclick="alert('Botão de autenticação clicado')">Teste Auth</button>
+    
+    <h2>Seção de Documentos</h2>
+    <button onclick="alert('Botão de documentos clicado')">Teste Documentos</button>
+    
+    <h2>Status da Página:</h2>
+    <pre id="status">
+Página carregada com sucesso.
+Verifique se os botões estão visíveis e funcionais.
+    </pre>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Página carregada completamente');
+            document.getElementById('status').textContent += '\nJavaScript executado com sucesso.';
+        });
+    </script>
+</body>
+</html>

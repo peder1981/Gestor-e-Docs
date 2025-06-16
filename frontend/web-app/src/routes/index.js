@@ -13,6 +13,7 @@ import DocumentViewerPage from '../pages/DocumentViewerPage'; // Nova página
 import ProfilePage from '../pages/ProfilePage'; // Nova página
 import SettingsPage from '../pages/SettingsPage'; // Nova página
 import NotFoundPage from '../pages/NotFoundPage'; // Usaremos um componente real agora
+import TestAuthPage from '../pages/TestAuthPage'; // Página de testes de autenticação
 
 // Layouts
 import AuthLayout from '../components/layout/AuthLayout';
@@ -51,6 +52,9 @@ const AppRouter = () => {
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
       </Route>
+
+      {/* Rota para painel de testes - acessível diretamente como /test-auth.html */}
+      <Route path="test-auth.html" element={<TestAuthPage />} />
 
       {/* Rotas Protegidas (dentro do MainLayout) */}
       <Route element={<MainLayout />}>

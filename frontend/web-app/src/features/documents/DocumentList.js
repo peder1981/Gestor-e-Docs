@@ -21,7 +21,11 @@ import {
   Menu,
   MenuItem,
   ListItemIcon, 
-  ListItemText 
+  ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import documentApiClient from '../../api/documentApiClient'; 
@@ -52,8 +56,16 @@ const DocumentList = () => {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedDoc, setSelectedDoc] = useState(null); 
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [docToDelete, setDocToDelete] = useState(null); 
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    tags: [],
+    category: ''
+  });
 
   const { isAuthenticated } = useContext(AuthContext);
   const { showNotification } = useContext(NotificationContext); 
@@ -110,25 +122,142 @@ const DocumentList = () => {
     setSelectedDoc(null);
   };
 
+  // Função para download do documento
+  const handleDownload = async (doc) => {
+    handleMenuClose();
+    try {
+      setIsLoading(true);
+      
+      // Fazer download usando fetch para evitar problemas de redirects e DNS
+      const downloadUrl = `${documentApiClient.defaults.baseURL}/${doc.id}/download/file`;
+      console.log('Iniciando download via fetch:', downloadUrl);
+      
+      // Usar fetch com opções para incluir credenciais
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        credentials: 'include', // Importante: inclui cookies para autenticação
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro no download: ${response.status} ${response.statusText}`);
+      }
+      
+      // Obter o blob do documento
+      const blob = await response.blob();
+      
+      // Tentar extrair o nome do arquivo do cabeçalho Content-Disposition
+      let filename = doc.title;
+      const disposition = response.headers.get('content-disposition');
+      if (disposition && disposition.includes('attachment')) {
+        const filenameMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]]/g, '');
+        }
+      }
+      
+      // Adicionar extensão se não tiver
+      if (!filename.includes('.')) {
+        const contentType = response.headers.get('content-type');
+        if (contentType) {
+          if (contentType.includes('pdf')) {
+            filename += '.pdf';
+          } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+            filename += '.jpg';
+          } else if (contentType.includes('png')) {
+            filename += '.png';
+          } else if (contentType.includes('msword') || contentType.includes('doc')) {
+            filename += '.doc';
+          } else if (contentType.includes('officedocument.wordprocessingml')) {
+            filename += '.docx';
+          }
+        }
+      }
+      
+      // Criar URL para o blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Criar elemento para download
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      
+      // Simular clique e depois remover o link
+      link.click();
+      document.body.removeChild(link);
+      
+      // Liberar a URL do objeto quando não for mais necessária
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+      
+      showNotification('Download concluído com sucesso!', 'success');
+    } catch (err) {
+      console.error('Erro no download:', err);
+      showNotification(`Erro ao tentar baixar o arquivo: ${err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para abrir modal de edição
+  const handleOpenEditModal = (doc) => {
+    handleMenuClose();
+    setSelectedDoc(doc);
+    // Preencher formulário com dados do documento
+    setEditFormData({
+      title: doc.title || '',
+      description: doc.description || '',
+      tags: doc.tags || [],
+      category: doc.category || ''
+    });
+    setOpenEditModal(true);
+  };
+
+  // Função para salvar metadados editados
+  const handleSaveMetadata = async () => {
+    if (!selectedDoc) return;
+    try {
+      setIsLoading(true);
+      const response = await documentApiClient.put(`/${selectedDoc.id}`, editFormData);
+      showNotification('Documento atualizado com sucesso!', 'success');
+      setOpenEditModal(false);
+      fetchDocuments(); // Recarregar lista
+    } catch (err) {
+      showNotification(`Erro ao atualizar documento: ${err.response?.data?.message || err.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDeleteRequest = (doc) => {
-    setSelectedDoc(doc); 
+    setDocToDelete(doc); // Usar o novo estado para documento a ser excluído
+    console.log('Documento definido para exclusão:', doc.id);
     setOpenConfirmDialog(true);
     handleMenuClose();
   };
 
   const handleConfirmDelete = async () => {
-    if (!selectedDoc) return;
+    if (!docToDelete) {
+      console.log('Nenhum documento selecionado para exclusão');
+      return;
+    }
+    
+    console.log('Iniciando exclusão do documento:', docToDelete.id);
     setOpenConfirmDialog(false);
-    setIsLoading(true); 
+    setIsLoading(true);
+    
     try {
-      await documentApiClient.delete(`/${selectedDoc.id}`);
+      console.log('Enviando solicitação de exclusão para:', `/${docToDelete.id}`);
+      const response = await documentApiClient.delete(`/${docToDelete.id}`);
+      console.log('Resposta da exclusão:', response.data);
+      
       showNotification('Documento excluído com sucesso!', 'success');
       fetchDocuments(); 
     } catch (err) {
+      console.error('Erro detalhado na exclusão:', err);
       showNotification(`Erro ao excluir documento: ${err.response?.data?.message || err.message}`, 'error');
     } finally {
       setIsLoading(false);
-      setSelectedDoc(null);
+      setDocToDelete(null); // Limpar o documento para exclusão
     }
   };
 
@@ -218,11 +347,11 @@ const DocumentList = () => {
                         open={Boolean(anchorEl) && selectedDoc?.id === doc.id}
                         onClose={handleMenuClose}
                     >
-                        <MenuItem onClick={() => { /* Implementar download */ handleMenuClose(); showNotification('Download não implementado.', 'info'); }}>
+                        <MenuItem onClick={() => handleDownload(doc)}>
                             <ListItemIcon><GetAppIcon fontSize="small" /></ListItemIcon>
                             <ListItemText>Baixar</ListItemText>
                         </MenuItem>
-                        <MenuItem onClick={() => { /* Implementar edição */ handleMenuClose(); showNotification('Edição não implementada.', 'info'); }}>
+                        <MenuItem onClick={() => handleOpenEditModal(doc)}>
                             <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
                             <ListItemText>Editar Metadados</ListItemText>
                         </MenuItem>
@@ -257,6 +386,54 @@ const DocumentList = () => {
         contentText={`Tem certeza que deseja excluir o documento "${selectedDoc?.title}"? Esta ação não poderá ser desfeita.`}
         confirmText="Excluir"
       />
+
+      {/* Modal de Edição de Metadados */}
+      <Dialog open={openEditModal} onClose={() => setOpenEditModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Editar Metadados do Documento</DialogTitle>
+        <DialogContent>
+          <TextField
+            margin="dense"
+            label="Título"
+            type="text"
+            fullWidth
+            value={editFormData.title}
+            onChange={(e) => setEditFormData({...editFormData, title: e.target.value})}
+          />
+          <TextField
+            margin="dense"
+            label="Descrição"
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            value={editFormData.description}
+            onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
+          />
+          <TextField
+            margin="dense"
+            label="Categoria"
+            type="text"
+            fullWidth
+            value={editFormData.category}
+            onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
+          />
+          <TextField
+            margin="dense"
+            label="Tags (separadas por vírgula)"
+            type="text"
+            fullWidth
+            value={Array.isArray(editFormData.tags) ? editFormData.tags.join(', ') : ''}
+            onChange={(e) => setEditFormData({...editFormData, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+            helperText="Exemplo: financeiro, contrato, 2025"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEditModal(false)}>Cancelar</Button>
+          <Button onClick={handleSaveMetadata} color="primary" variant="contained">
+            Salvar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };
