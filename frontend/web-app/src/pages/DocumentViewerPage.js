@@ -62,32 +62,48 @@ const DocumentViewerPage = () => {
   }, [documentId, isAuthenticated, navigate]);
 
   const handleDownload = async () => {
-    if (!document) return;
-    try {
-        // O endpoint de download pode ser diferente e pode retornar um blob
-        const response = await documentApiClient.get(`/${documentId}/download`, {
-            responseType: 'blob', // Importante para downloads de arquivo
-        });
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        // Tenta pegar o nome do arquivo do header Content-Disposition, ou usa o nome do documento
-        const contentDisposition = response.headers['content-disposition'];
-        let fileName = document.name || 'documento.md';
-        if (contentDisposition) {
-            const fileNameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;"\n]*)/i);
-            if (fileNameMatch && fileNameMatch[1]) {
-                fileName = decodeURIComponent(fileNameMatch[1]);
-            }
-        }
-        link.setAttribute('download', fileName);
-        document.body.appendChild(link);
-        link.click();
-        link.parentNode.removeChild(link);
-        window.URL.revokeObjectURL(url);
-    } catch (err) {
-        setError('Erro ao tentar baixar o arquivo: ' + (err.response?.data?.message || err.message));
-    }
+  if (!document) return;
+  try {
+      // Usar o endpoint correto que retorna o arquivo diretamente
+      const downloadUrl = `${documentApiClient.defaults.baseURL}/${documentId}/download/file`;
+      console.log('Iniciando download via fetch:', downloadUrl);
+      
+      // Usar fetch com opções para incluir credenciais
+      const response = await fetch(downloadUrl, {
+          method: 'GET',
+          credentials: 'include', // Importante: inclui cookies para autenticação
+      });
+      
+      if (!response.ok) {
+          throw new Error(`Erro no download: ${response.status} ${response.statusText}`);
+      }
+      
+      // Obter o blob do documento
+      const blob = await response.blob();
+      
+      // Criar URL para o blob
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Tenta pegar o nome do arquivo do header Content-Disposition, ou usa o nome do documento
+      const contentDisposition = response.headers.get('content-disposition');
+      let fileName = document.name || 'documento.md';
+      if (contentDisposition) {
+          const fileNameMatch = contentDisposition.match(/filename\*?=['"]?(?:UTF-\d['"]*)?([^;"\n]*)/i);
+          if (fileNameMatch && fileNameMatch[1]) {
+              fileName = decodeURIComponent(fileNameMatch[1]);
+          }
+      }
+      
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+  } catch (err) {
+      setError('Erro ao tentar baixar o arquivo: ' + err.message);
+  }
 };
 
 

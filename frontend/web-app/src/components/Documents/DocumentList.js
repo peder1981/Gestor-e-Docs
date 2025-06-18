@@ -100,18 +100,30 @@ const DocumentList = () => {
       setActionLoading(true);
       setActionError(null);
       
-      // Chamada para API de download
-      const response = await documentApiClient.get(`/${docId}/download`, {
-        responseType: 'blob'
+      // Chamada para API de download usando o endpoint correto que retorna o arquivo diretamente
+      const downloadUrl = `${documentApiClient.defaults.baseURL}/${docId}/download/file`;
+      console.log('Iniciando download via fetch:', downloadUrl);
+      
+      // Usar fetch com opções para incluir credenciais
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        credentials: 'include', // Importante: inclui cookies para autenticação
       });
       
-      // Criação do URL para o blob e download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      if (!response.ok) {
+        throw new Error(`Erro no download: ${response.status} ${response.statusText}`);
+      }
+      
+      // Obter o blob do documento
+      const blob = await response.blob();
+      
+      // Criar URL para o blob
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       
       // Obter nome do arquivo a partir dos headers ou usar um padrão
-      const contentDisposition = response.headers['content-disposition'];
+      const contentDisposition = response.headers.get('content-disposition');
       let filename = 'documento.pdf';
       if (contentDisposition) {
         const filenameRegex = /filename[^;=\n]*=((['"]).*)\2|[^;\n]*/;
@@ -133,7 +145,7 @@ const DocumentList = () => {
       setTimeout(() => setActionSuccess(''), 3000);
     } catch (err) {
       console.error('Erro ao baixar documento:', err);
-      setActionError(err.response?.data?.message || 'Erro ao baixar o documento');
+      setActionError(err.message || 'Erro ao baixar o documento');
     } finally {
       setActionLoading(false);
     }
